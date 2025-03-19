@@ -157,88 +157,103 @@
     <!-- JavaScript for enhanced controls -->
     <script>
        if ('serviceWorker' in navigator) {
-         navigator.serviceWorker.register('/sw.js')
-             .then((registration) => {
-                 console.log('Service Worker registered with scope:', registration.scope);
-             })
-             .catch((error) => {
-                 console.log('Service Worker registration failed:', error);
-             });
+      navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+              console.log('Service Worker registered with scope:', registration.scope);
+          })
+          .catch((error) => {
+              console.log('Service Worker registration failed:', error);
+          });
+    }
+    // Enable buttons when JavaScript is available
+    console.log('Enabling buttons...');
+    document.getElementById('autoplay-toggle').classList.remove('disabled');
+    document.getElementById('autoplay-toggle').disabled = false;
+    console.log('Autoplay button enabled');
+
+    document.getElementById('prev').classList.remove('disabled');
+    document.getElementById('prev').disabled = false;
+    console.log('Previous button enabled');
+
+    document.getElementById('next').classList.remove('disabled');
+    document.getElementById('next').disabled = false;
+    console.log('Next button enabled');
+
+    let autoplay = false;
+    const autoplayToggle = document.getElementById('autoplay-toggle');
+    const tracks = document.querySelectorAll('.track audio');
+    const trackContainers = document.querySelectorAll('.track');
+    let currentIndex = 0;
+
+    // Autoplay toggle functionality
+    autoplayToggle.addEventListener('click', () => {
+        autoplay = !autoplay;
+        console.log(`Autoplay set to: ${autoplay}`);
+        autoplayToggle.textContent = `Autoplay: ${autoplay ? 'On' : 'Off'}`;
+    });
+
+    // Play a specific track by index and update the active track highlight
+    function playTrack(index) {
+        console.log(`Request to play track at index: ${index}`);
+        if (index < 0) {
+            index = tracks.length - 1; // Go to the last track
+            console.log('Index out of bounds (low), wrapping to last track');
+        } else if (index >= tracks.length) {
+            index = 0; // Restart from the first track
+            console.log('Index out of bounds (high), wrapping to first track');
         }
-        // Enable buttons when JavaScript is available
-        console.log('Enabling buttons...');
-        document.getElementById('autoplay-toggle').classList.remove('disabled');
-        document.getElementById('autoplay-toggle').disabled = false;
-        console.log('Autoplay button enabled');
+        console.log(`Playing track at index: ${index}`);
 
-        document.getElementById('prev').classList.remove('disabled');
-        document.getElementById('prev').disabled = false;
-        console.log('Previous button enabled');
-
-        document.getElementById('next').classList.remove('disabled');
-        document.getElementById('next').disabled = false;
-        console.log('Next button enabled');
-
-        let autoplay = false;
-        const autoplayToggle = document.getElementById('autoplay-toggle');
-        const tracks = document.querySelectorAll('.track audio');
-        const trackContainers = document.querySelectorAll('.track');
-        let currentIndex = 0;
-
-        // Autoplay toggle functionality
-        autoplayToggle.addEventListener('click', () => {
-            autoplay = !autoplay;
-            console.log(`Autoplay set to: ${autoplay}`);
-            autoplayToggle.textContent = `Autoplay: ${autoplay ? 'On' : 'Off'}`;
-        });
-
-        // Play a specific track by index and update the active track highlight
-        function playTrack(index) {
-            console.log(`Request to play track at index: ${index}`);
-            if (index < 0) {
-                index = tracks.length - 1; // Go to the last track
-                console.log('Index out of bounds (low), wrapping to last track');
-            } else if (index >= tracks.length) {
-                index = 0; // Restart from the first track
-                console.log('Index out of bounds (high), wrapping to first track');
+        // Pause the currently playing track
+        tracks.forEach(track => {
+            if (!track.paused) {
+                track.pause();
             }
-            console.log(`Playing track at index: ${index}`);
-            tracks[currentIndex].pause();
-            trackContainers[currentIndex].classList.remove('active');
-            tracks[index].play();
-            trackContainers[index].classList.add('active');
-            currentIndex = index;
-            console.log(`Current track index set to: ${currentIndex}`);
-        }
-
-        // Next and Previous buttons functionality
-        document.getElementById('prev').addEventListener('click', () => {
-            console.log('Previous button clicked');
-            playTrack(currentIndex - 1);
-        });
-        document.getElementById('next').addEventListener('click', () => {
-            console.log('Next button clicked');
-            playTrack(currentIndex + 1);
         });
 
-        // Highlight and autoplay the next track when the current one ends
-        tracks.forEach((track, index) => {
-            track.addEventListener('play', () => {
-                console.log(`Track at index ${index} started playing`);
-                trackContainers.forEach(t => t.classList.remove('active'));
-                trackContainers[index].classList.add('active');
-                currentIndex = index; // Update currentIndex to the currently playing track
-                console.log(`Updated currentIndex to: ${currentIndex}`);
-            });
+        trackContainers[currentIndex].classList.remove('active');
+        tracks[index].play();
+        trackContainers[index].classList.add('active');
+        currentIndex = index;
+        console.log(`Current track index set to: ${currentIndex}`);
+    }
 
-            track.addEventListener('ended', () => {
-                console.log(`Track at index ${index} ended`);
-                if (autoplay) {
-                    console.log('Autoplay is on, playing next track');
-                    playTrack(index + 1);
+    // Next and Previous buttons functionality
+    document.getElementById('prev').addEventListener('click', () => {
+        console.log('Previous button clicked');
+        playTrack(currentIndex - 1);
+    });
+    document.getElementById('next').addEventListener('click', () => {
+        console.log('Next button clicked');
+        playTrack(currentIndex + 1);
+    });
+
+    // Highlight and autoplay the next track when the current one ends
+    tracks.forEach((track, index) => {
+        track.addEventListener('play', function() {
+            console.log(`Track at index ${index} started playing`);
+
+            // Pause all other tracks
+            tracks.forEach(otherTrack => {
+                if (otherTrack !== this && !otherTrack.paused) {
+                    otherTrack.pause();
                 }
             });
+
+            trackContainers.forEach(t => t.classList.remove('active'));
+            trackContainers[index].classList.add('active');
+            currentIndex = index; // Update currentIndex to the currently playing track
+            console.log(`Updated currentIndex to: ${currentIndex}`);
         });
+
+        track.addEventListener('ended', () => {
+            console.log(`Track at index ${index} ended`);
+            if (autoplay) {
+                console.log('Autoplay is on, playing next track');
+                playTrack(index + 1);
+            }
+        });
+    });
     </script>
     <footer style="margin-top: 20px; color: #888; font-size: 0.8em;">
         Version 1.0.3
