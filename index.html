@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta property="og:title" content="Base 3 - Album Player">
+    <meta property="og:description" content="Listen to the tracks from Gavin's album 'Base 3' online.">
+    <meta property="og:image" content="images/Base3Logo.jpg">
+
+    <title>Base 3 - Album Player</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; background-color: #222; color: #fff; }
+        
+        .logo { margin-top: 20px; width: 80%; max-width: 400px; border-radius: 10px; }
+        .track { width: 90%; margin: 10px 0; padding: 10px; background: #333; border-radius: 5px; display: flex; flex-direction: column; align-items: center; }
+        .track.active { border: 2px solid #1db954; background: #444; }
+        .track audio { width: 100%; }
+        .track-info { margin-top: 8px; }
+        .download-link { color: #1db954; text-decoration: none; font-weight: bold; margin-top: 5px; }
+        .download-link:hover { text-decoration: underline; }
+        button { padding: 10px 20px; margin: 10px; background-color: #1db954; border: none; color: white; cursor: pointer; border-radius: 5px; }
+        button.disabled { background-color: #555; cursor: not-allowed; }
+        button:hover:not(.disabled) { background-color: #17a74e; }
+        
+            @media (max-width: 600px) {
+            body { padding: 10px; }
+            .logo { width: 100%; max-width: 300px; }
+            .track { width: 100%; padding: 8px; margin: 8px 0; }
+            .track-info { font-size: 0.9em; }
+            button { padding: 8px 16px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Logo Image -->
+    <img src="images/Base3Logo.jpg" alt="Base 3 Logo" class="logo">
+
+    <!-- Autoplay Toggle Button (disabled by default for noscript) -->
+    <button id="autoplay-toggle" aria-label="Toggle Autoplay" class="disabled" disabled>Autoplay: Off</button>
+
+    <!-- Navigation Buttons (disabled by default for noscript) -->
+    <div>
+        <button id="prev" aria-label="Previous Track" class="disabled" disabled>Previous</button>
+        <button id="next" aria-label="Next Track" class="disabled" disabled>Next</button>
+    </div>
+
+    <!-- Tracks -->
+    <div class="track">
+        <audio controls preload="metadata">
+            <source src="music/Lead_with_Your_Hips.m4a" type="audio/mp4">
+            <source src="music/Lead_with_Your_Hips.wav" type="audio/wav">
+            Your browser does not support the audio element.
+        </audio>
+        <div class="track-info">01. Lead with Your Hips</div>
+        <a class="download-link" href="music/Lead_with_Your_Hips.m4a" download>Download M4A</a>
+        <a class="download-link" href="music/Lead_with_Your_Hips.wav" download>Download WAV</a>
+    </div>
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/Midnight_Attitude.m4a" type="audio/mp4">
+        <source src="music/Midnight_Attitude.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">02. Midnight Attitude</div>
+    <a class="download-link" href="music/Midnight_Attitude.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/Midnight_Attitude.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/Full_Capacity.m4a" type="audio/mp4">
+        <source src="music/Full_Capacity.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">03. Full Capacity</div>
+    <a class="download-link" href="music/Full_Capacity.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/Full_Capacity.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/Deep_Sleep.m4a" type="audio/mp4">
+        <source src="music/Deep_Sleep.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">04. Deep Sleep</div>
+    <a class="download-link" href="music/Deep_Sleep.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/Deep_Sleep.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/Level_9.m4a" type="audio/mp4">
+        <source src="music/Level_9.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">05. Level 9</div>
+    <a class="download-link" href="music/Level_9.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/Level_9.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/windy.m4a" type="audio/mp4">
+        <source src="music/windy.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">06. windy</div>
+    <a class="download-link" href="music/windy.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/windy.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/T-Rex_T-Rex.m4a" type="audio/mp4">
+        <source src="music/T-Rex_T-Rex.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">07. T-Rex T-Rex</div>
+    <a class="download-link" href="music/T-Rex_T-Rex.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/T-Rex_T-Rex.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/Walking_on_the_C.m4a" type="audio/mp4">
+        <source src="music/Walking_on_the_C.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">08. Walking on the C</div>
+    <a class="download-link" href="music/Walking_on_the_C.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/Walking_on_the_C.wav" download>Download WAV</a>
+</div>
+
+<div class="track">
+    <audio controls preload="metadata">
+        <source src="music/Won_2_1.m4a" type="audio/mp4">
+        <source src="music/Won_2_1.wav" type="audio/wav">
+        Your browser does not support the audio element.
+    </audio>
+    <div class="track-info">09. Won 2 1</div>
+    <a class="download-link" href="music/Won_2_1.m4a" download>Download M4A</a>
+    <a class="download-link" href="music/Won_2_1.wav" download>Download WAV</a>
+</div>
+
+    <!-- Fallback message for users with JavaScript disabled -->
+    <noscript>
+        <style>
+            .disabled { display: none; } /* Hide disabled buttons if JavaScript is off */
+        </style>
+        <p style="color: #ff5555; text-align: center; padding: 20px;">
+            JavaScript is disabled in your browser. That's cool. There is some audio player controls
+            I built but the page should work without JavaScript.
+        </p>
+    </noscript>
+
+    <!-- JavaScript for enhanced controls -->
+    <script>
+       if ('serviceWorker' in navigator) {
+         navigator.serviceWorker.register('/sw.js')
+             .then((registration) => {
+                 console.log('Service Worker registered with scope:', registration.scope);
+             })
+             .catch((error) => {
+                 console.log('Service Worker registration failed:', error);
+             });
+        }
+        // Enable buttons when JavaScript is available
+        console.log('Enabling buttons...');
+        document.getElementById('autoplay-toggle').classList.remove('disabled');
+        document.getElementById('autoplay-toggle').disabled = false;
+        console.log('Autoplay button enabled');
+
+        document.getElementById('prev').classList.remove('disabled');
+        document.getElementById('prev').disabled = false;
+        console.log('Previous button enabled');
+
+        document.getElementById('next').classList.remove('disabled');
+        document.getElementById('next').disabled = false;
+        console.log('Next button enabled');
+
+        let autoplay = false;
+        const autoplayToggle = document.getElementById('autoplay-toggle');
+        const tracks = document.querySelectorAll('.track audio');
+        const trackContainers = document.querySelectorAll('.track');
+        let currentIndex = 0;
+
+        // Autoplay toggle functionality
+        autoplayToggle.addEventListener('click', () => {
+            autoplay = !autoplay;
+            console.log(`Autoplay set to: ${autoplay}`);
+            autoplayToggle.textContent = `Autoplay: ${autoplay ? 'On' : 'Off'}`;
+        });
+
+        // Play a specific track by index and update the active track highlight
+        function playTrack(index) {
+            console.log(`Request to play track at index: ${index}`);
+            if (index < 0) {
+                index = tracks.length - 1; // Go to the last track
+                console.log('Index out of bounds (low), wrapping to last track');
+            } else if (index >= tracks.length) {
+                index = 0; // Restart from the first track
+                console.log('Index out of bounds (high), wrapping to first track');
+            }
+            console.log(`Playing track at index: ${index}`);
+            tracks[currentIndex].pause();
+            trackContainers[currentIndex].classList.remove('active');
+            tracks[index].play();
+            trackContainers[index].classList.add('active');
+            currentIndex = index;
+            console.log(`Current track index set to: ${currentIndex}`);
+        }
+
+        // Next and Previous buttons functionality
+        document.getElementById('prev').addEventListener('click', () => {
+            console.log('Previous button clicked');
+            playTrack(currentIndex - 1);
+        });
+        document.getElementById('next').addEventListener('click', () => {
+            console.log('Next button clicked');
+            playTrack(currentIndex + 1);
+        });
+
+        // Highlight and autoplay the next track when the current one ends
+        tracks.forEach((track, index) => {
+            track.addEventListener('play', () => {
+                console.log(`Track at index ${index} started playing`);
+                trackContainers.forEach(t => t.classList.remove('active'));
+                trackContainers[index].classList.add('active');
+                currentIndex = index; // Update currentIndex to the currently playing track
+                console.log(`Updated currentIndex to: ${currentIndex}`);
+            });
+
+            track.addEventListener('ended', () => {
+                console.log(`Track at index ${index} ended`);
+                if (autoplay) {
+                    console.log('Autoplay is on, playing next track');
+                    playTrack(index + 1);
+                }
+            });
+        });
+    </script>
+    <footer style="margin-top: 20px; color: #888; font-size: 0.8em;">
+        Version 1.0.3
+    </footer>
+</html>
+
