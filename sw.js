@@ -111,6 +111,14 @@ self.addEventListener('message', (event) => {
                 });
             })
         );
+    } else if (action === 'check') {
+        event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.match(url).then((response) => {
+                    respond(response ? 'saved' : 'removed');
+                });
+            })
+        );
     }
 });
 
