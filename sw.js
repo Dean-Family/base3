@@ -1,6 +1,6 @@
 // sw.js - Service Worker for caching the album player resources
 
-const CACHE_NAME = 'base3-album-cache-v5';
+const CACHE_NAME = 'base3-album-cache-v6';
 const urlsToCache = [
     '/',
     '/index.html',

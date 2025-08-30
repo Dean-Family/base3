@@ -7,6 +7,12 @@ Open `index.html` in a modern browser to play tracks. A service worker caches au
 files for offline playback. The app also includes a web app manifest and theme color
 so it can be installed like a Progressive Web App.
 
+## Debugging offline support
+The player now exposes a **Debug Tools** section in the UI that shows your current
+online status and lists everything stored in the service worker cache. You can
+refresh the list or clear all caches directly from the page to help troubleshoot
+offline behaviour.
+
 ## License
 This project is made available under **your choice** of the following licenses:
 
