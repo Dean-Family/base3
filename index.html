@@ -206,12 +206,20 @@
       const removeButtons = document.querySelectorAll('.remove-offline');
       let currentIndex = 0;
 
+      const swReady = 'serviceWorker' in navigator
+        ? new Promise(resolve => {
+            if (navigator.serviceWorker.controller) {
+              resolve();
+            } else {
+              navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
+            }
+          })
+        : Promise.resolve();
+
       function sendToServiceWorker(action, url) {
         if (!('serviceWorker' in navigator)) return;
-        navigator.serviceWorker.ready.then(registration => {
-          if (registration.active) {
-            registration.active.postMessage({ action, url });
-          }
+        swReady.then(() => {
+          navigator.serviceWorker.controller?.postMessage({ action, url });
         });
       }
 
@@ -234,13 +242,26 @@
         sendToServiceWorker('check', button.dataset.url);
       });
 
+      let _lastProgressAt = 0;
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', (event) => {
-          const { status, url } = event.data || {};
+          const { status, url, received, size } = event.data || {};
           if (!status || !url) return;
           const saveBtn = document.querySelector(`button.save-offline[data-url="${url}"]`);
           const removeBtn = document.querySelector(`button.remove-offline[data-url="${url}"]`);
           if (!saveBtn || !removeBtn) return;
+
+          if (status === 'downloading') {
+            const now = performance.now();
+            if (now - _lastProgressAt < 150) return;
+            _lastProgressAt = now;
+
+            const pct = size ? Math.round((received / size) * 100) : 0;
+            saveBtn.textContent = `Saving ${pct}%`;
+            saveBtn.disabled = true;
+            saveBtn.classList.add('disabled');
+            return;
+          }
 
           if (status === 'saved') {
             saveBtn.textContent = 'Saved';
@@ -254,6 +275,10 @@
             saveBtn.classList.remove('disabled');
             removeBtn.disabled = true;
             removeBtn.classList.add('disabled');
+          } else if (status === 'error') {
+            saveBtn.textContent = 'Error';
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('disabled');
           }
         });
       }
