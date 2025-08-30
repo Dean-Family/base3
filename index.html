@@ -185,6 +185,22 @@
     const trackContainers = document.querySelectorAll('.track');
     let currentIndex = 0;
 
+    const saveButtons = document.querySelectorAll('.save-button');
+    const removeButtons = document.querySelectorAll('.remove-button');
+
+    if ('caches' in window) {
+        const trackUrls = Array.from(saveButtons).map(btn => btn.dataset.url);
+        trackUrls.forEach((url, index) => {
+            caches.match(url).then((cached) => {
+                if (cached) {
+                    saveButtons[index].textContent = 'Saved';
+                    removeButtons[index].disabled = false;
+                    removeButtons[index].classList.remove('disabled');
+                }
+            });
+        });
+    }
+
     // Autoplay toggle functionality
     autoplayToggle.addEventListener('click', () => {
         autoplay = !autoplay;
