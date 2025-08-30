@@ -247,7 +247,7 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
       chunks.push(value);
       received += value.byteLength;
       const rec = inFlight.get(urlStr);
-      const now = performance.now();
+      const now = self.performance?.now?.() || Date.now();
       if (rec && now - rec.lastPostTs >= 120) {
         sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
         rec.lastPostTs = now;
