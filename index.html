@@ -218,7 +218,11 @@
       let currentIndex = 0;
       let persistenceTried = false;
 
-      const toKey = a => new URL(a.currentSrc || a.src || a.querySelector('source')?.src || '', location.href).pathname;
+      const toKey = a =>
+        new URL(
+          a.querySelector('source')?.getAttribute('src') || a.currentSrc || a.src || '',
+          location.href
+        ).pathname;
       tracks.forEach(t => wireAudio(t, toKey));
       tracks.forEach(t => resumeIfPossible(t));
 

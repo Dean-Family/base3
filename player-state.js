@@ -35,13 +35,20 @@ function idbGet(db) {
 
 export function wireAudio(audio, urlForTrackKeyFn) {
   const dbPromise = openDB();
-  const toKey = urlForTrackKeyFn || (a => new URL(a.currentSrc || a.src, location.href).pathname);
+  const toKey =
+    urlForTrackKeyFn ||
+    (a =>
+      new URL(
+        a.querySelector('source')?.getAttribute('src') || a.currentSrc || a.src || '',
+        location.href
+      ).pathname);
+
   audio.dataset.trackKey = toKey(audio);
   let lastWrite = 0;
 
   async function writeState() {
     const db = await dbPromise;
-    const trackKey = toKey(audio);
+    const trackKey = audio.dataset.trackKey || toKey(audio);
     await idbPut(db, {
       id: 'player',
       trackKey,
@@ -72,11 +79,26 @@ export async function resumeIfPossible(audio) {
   const rec = await idbGet(db);
   if (!rec || (rec.status !== 'playing' && rec.status !== 'paused')) return;
   if (audio.dataset.trackKey !== rec.trackKey) return;
-  audio.src = rec.trackKey;
-  audio.currentTime = rec.position || 0;
-  if (rec.status === 'playing') {
-    try { await audio.play(); } catch (e) {}
+  const current = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+  const needsSrc = current !== rec.trackKey;
+  if (needsSrc) audio.src = rec.trackKey;
+
+  const seek = async () => {
+    audio.currentTime = rec.position || 0;
+    if (rec.status === 'playing') {
+      try {
+        await audio.play();
+      } catch (e) {
+        /* ignore */
+      }
+    } else {
+      audio.pause();
+    }
+  };
+
+  if (audio.readyState >= 1 && !needsSrc) {
+    seek();
   } else {
-    audio.pause();
+    audio.addEventListener('loadedmetadata', seek, { once: true });
   }
 }
