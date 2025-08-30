@@ -81,12 +81,26 @@ self.addEventListener('activate', event => {
 
 // Helpers -----------------------------------------------------------------
 function parseRange(rangeHeader, size) {
-  // Supports only single byte range: "bytes=start-end"
-  const matches = /^bytes=([0-9]*)-([0-9]*)$/.exec(rangeHeader);
-  if (!matches) return null;
-  let start = matches[1] === '' ? 0 : Number(matches[1]);
-  let end = matches[2] === '' ? size - 1 : Number(matches[2]);
-  if (isNaN(start) || isNaN(end) || start > end || end >= size) return null;
+  // Supports: "bytes=START-END", "bytes=START-", "bytes=-SUFFIX"
+  const m = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader || '');
+  if (!m) return null;
+
+  let start = m[1] === '' ? undefined : Number(m[1]);
+  let end   = m[2] === '' ? undefined : Number(m[2]);
+  if (start === undefined && end === undefined) return null;
+  if (start !== undefined && (isNaN(start) || start < 0)) return null;
+  if (end   !== undefined && (isNaN(end)   || end   < 0)) return null;
+
+  if (start === undefined) {
+    // "-SUFFIX" → last N bytes
+    const length = Math.min(end, size);
+    start = Math.max(0, size - length);
+    end = size - 1;
+  } else {
+    if (end === undefined || end >= size) end = size - 1;
+  }
+
+  if (start >= size || start > end) return null;
   return { start, end };
 }
 
@@ -97,47 +111,56 @@ async function serveFromIDB(request) {
   const record = await idbGet(db, 'tracks', trackKey);
 
   if (!record || !record.blob) {
-    // Not stored offline; fall back to network
+    // No offline copy → network
     return fetch(request);
   }
 
   const blob = record.blob;
   const mime = record.mime || 'application/octet-stream';
+  const size = blob.size;
 
   if (request.headers.has('range')) {
-    const range = parseRange(request.headers.get('range'), blob.size);
-    if (range) {
-      const slice = blob.slice(range.start, range.end + 1);
-      return new Response(slice, {
-        status: 206,
-        headers: {
-          'Content-Type': mime,
-          'Content-Length': String(range.end - range.start + 1),
-          'Content-Range': `bytes ${range.start}-${range.end}/${blob.size}`
-        }
+    const parsed = parseRange(request.headers.get('range'), size);
+    if (!parsed) {
+      return new Response(null, {
+        status: 416,
+        headers: { 'Content-Range': `bytes */${size}` }
       });
     }
+    const { start, end } = parsed;
+    const slice = blob.slice(start, end + 1);
+    return new Response(slice, {
+      status: 206,
+      headers: {
+        'Content-Type': mime,
+        'Accept-Ranges': 'bytes',
+        'Content-Range': `bytes ${start}-${end}/${size}`,
+        'Content-Length': String(end - start + 1)
+      }
+    });
   }
 
+  // Full response
   return new Response(blob, {
     headers: {
       'Content-Type': mime,
-      'Content-Length': String(blob.size)
+      'Accept-Ranges': 'bytes',
+      'Content-Length': String(size)
     }
   });
 }
 
 // Fetch handling -----------------------------------------------------------
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/music/')) {
-    event.respondWith(serveFromIDB(event.request));
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  if (req.destination === 'audio' || url.pathname.startsWith('/music/')) {
+    event.respondWith(serveFromIDB(req));
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(resp => resp || fetch(event.request))
-  );
+  event.respondWith(caches.match(req).then(r => r || fetch(req)));
 });
 
 // Messaging ---------------------------------------------------------------
