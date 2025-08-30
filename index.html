@@ -357,10 +357,22 @@
             removeBtn.disabled = true;
             removeBtn.classList.add('disabled');
           } else if (status === 'error') {
-            offlineMap.delete(url);
+            const why   = event.data?.reason || 'unknown';
+            const info  = event.data?.info;
+            const usage = info?.usage, quota = info?.quota;
+
             saveBtn.textContent = 'Error';
             saveBtn.disabled = false;
             saveBtn.classList.remove('disabled');
+
+            const mb = (n) => (n/1e6).toFixed(1);
+            let msg = `Save failed (${why}).`;
+            if (quota) msg += ` Storage ${mb(usage||0)}/${mb(quota)} MB.`;
+            showToast(msg);
+
+            offlineMap.delete(url);
+            updateDiagnostics();
+            return;
           }
 
           updateDiagnostics();

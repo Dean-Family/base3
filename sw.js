@@ -198,15 +198,36 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     res = await fetch(urlStr, { signal: controller.signal });
   } catch (err) {
     inFlight.delete(urlStr);
-    if (err.name === 'AbortError') return;
-    sourceClient?.postMessage({ status: 'error', url: urlStr });
+    if (err.name === 'AbortError') {
+      sourceClient?.postMessage({ status: 'removed', url: urlStr });
+    } else {
+      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'fetch' });
+    }
     return;
   }
 
-  if (!res.ok || !res.body) {
+  if (!res.ok) {
     inFlight.delete(urlStr);
-    sourceClient?.postMessage({ status: 'error', url: urlStr });
+    sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'network' });
     return;
+  }
+  if (!res.body) {
+    // Fallback for Safari: no streaming body available
+    try {
+      const mime = res.headers.get('Content-Type') || 'audio/mp4';
+      const url  = new URL(urlStr, self.location.origin);
+      const key  = url.pathname;
+      const db   = await openDB();
+
+      const blob = await res.blob(); // single-shot
+      await saveBlobToIDB(db, key, mime, blob);
+      inFlight.delete(urlStr);
+      sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
+    } catch (err) {
+      inFlight.delete(urlStr);
+      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'no-body' });
+    }
+    return; // stop here, we handled the no-body case
   }
 
   const size = Number(res.headers.get('Content-Length') || 0);
@@ -226,7 +247,7 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
       chunks.push(value);
       received += value.byteLength;
       const rec = inFlight.get(urlStr);
-      const now = performance.now();
+      const now = self.performance?.now?.() || Date.now();
       if (rec && now - rec.lastPostTs >= 120) {
         sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
         rec.lastPostTs = now;
@@ -241,16 +262,49 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     }
   } catch (err) {
     inFlight.delete(urlStr);
+    await idbDelete(db, 'downloads', key);
     if (err.name === 'AbortError') {
-      await idbDelete(db, 'downloads', key);
-      return;
+      sourceClient?.postMessage({ status: 'removed', url: urlStr });
+    } else {
+      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'read' });
     }
-    sourceClient?.postMessage({ status: 'error', url: urlStr });
     return;
   }
 
-  const blob = new Blob(chunks, { type: mime });
-  await saveBlobToIDB(db, key, mime, blob);
+  let blob;
+  try {
+    blob = new Blob(chunks, { type: mime });
+  } catch (err) {
+    inFlight.delete(urlStr);
+    await idbDelete(db, 'downloads', key);
+    sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'oom' });
+    return;
+  }
+
+  try {
+    await saveBlobToIDB(db, key, mime, blob);
+  } catch (err) {
+    inFlight.delete(urlStr);
+    await idbDelete(db, 'downloads', key);
+    if (err.name === 'QuotaExceededError') {
+      let info;
+      try {
+        if (navigator.storage && navigator.storage.estimate) {
+          const est = await navigator.storage.estimate();
+          info = { usage: est.usage, quota: est.quota };
+        }
+      } catch (e) {
+        /* ignore */
+      }
+      const msg = { status: 'error', url: urlStr, reason: 'quota' };
+      if (info) msg.info = info;
+      sourceClient?.postMessage(msg);
+    } else {
+      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'idb' });
+    }
+    return;
+  }
+
   inFlight.delete(urlStr);
   sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
 }
