@@ -161,6 +161,14 @@
     <button class="remove-offline" data-url="/music/Won_2_1.m4a">Remove from offline</button>
   </div>
 
+  <section id="debug-tools" style="width:90%;max-width:400px;margin-top:20px;background:#333;padding:10px;border-radius:5px;">
+    <h2 style="margin-top:0;">Debug Tools</h2>
+    <p id="online-status" style="margin:5px 0;">Status: Unknown</p>
+    <button id="refresh-cache">Refresh Cache List</button>
+    <button id="clear-cache">Clear All Caches</button>
+    <ul id="cache-list" style="list-style:none;padding-left:0;max-height:150px;overflow-y:auto;margin-top:10px;"></ul>
+  </section>
+
   <!-- Fallback message for users with JavaScript disabled -->
   <noscript>
     <style>.disabled { display: none; }</style>
@@ -170,7 +178,7 @@
   </noscript>
 
   <footer style="margin-top: 20px; color: #888; font-size: 0.8em;">
-    Version 1.0.4
+    Version 1.1.0
   </footer>
 
   <!-- JavaScript for enhanced controls -->
@@ -249,6 +257,48 @@
           }
         });
       }
+
+      // Debug tools
+      const cacheList = document.getElementById('cache-list');
+      const refreshCacheBtn = document.getElementById('refresh-cache');
+      const clearCacheBtn = document.getElementById('clear-cache');
+      const onlineStatus = document.getElementById('online-status');
+
+      function updateOnlineStatus() {
+        onlineStatus.textContent = `Status: ${navigator.onLine ? 'Online' : 'Offline'}`;
+      }
+
+      updateOnlineStatus();
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
+
+      async function refreshCacheList() {
+        cacheList.innerHTML = '';
+        const cacheNames = await caches.keys();
+        for (const name of cacheNames) {
+          const cache = await caches.open(name);
+          const requests = await cache.keys();
+          requests.forEach(req => {
+            const li = document.createElement('li');
+            li.textContent = `${name} — ${new URL(req.url).pathname}`;
+            cacheList.appendChild(li);
+          });
+        }
+        if (!cacheList.children.length) {
+          const li = document.createElement('li');
+          li.textContent = 'No cached items';
+          cacheList.appendChild(li);
+        }
+      }
+
+      refreshCacheBtn.addEventListener('click', refreshCacheList);
+      clearCacheBtn.addEventListener('click', async () => {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+        refreshCacheList();
+      });
+
+      refreshCacheList();
 
       // Autoplay toggle
       autoplayToggle?.addEventListener('click', () => {
