@@ -208,7 +208,8 @@
         let currentIndex = 0;
 
         function sendToServiceWorker(action, url) {
-            navigator.serviceWorker?.ready.then((registration) => {
+            if (!('serviceWorker' in navigator)) return;
+            navigator.serviceWorker.ready.then((registration) => {
                 if (registration.active) {
                     registration.active.postMessage({ action, url });
                     console.log(`Sent ${action} request for ${url}`);
@@ -228,6 +229,11 @@
             button.addEventListener('click', () => {
                 sendToServiceWorker('remove', button.dataset.url);
             });
+        });
+
+        // Check cache status on load
+        saveButtons.forEach((button) => {
+            sendToServiceWorker('check', button.dataset.url);
         });
 
         if ('serviceWorker' in navigator) {
