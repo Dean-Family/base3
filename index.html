@@ -185,8 +185,8 @@
     const trackContainers = document.querySelectorAll('.track');
     let currentIndex = 0;
 
-    const saveButtons = document.querySelectorAll('.save-button');
-    const removeButtons = document.querySelectorAll('.remove-button');
+    const saveButtons = document.querySelectorAll('.save');
+    const removeButtons = document.querySelectorAll('.remove');
 
     if ('caches' in window) {
         const trackUrls = Array.from(saveButtons).map(btn => btn.dataset.url);
