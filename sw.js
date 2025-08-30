@@ -28,6 +28,14 @@ self.addEventListener('fetch', (event) => {
     const requestURL = new URL(event.request.url);
 
     if (requestURL.pathname.startsWith('/music/')) {
+        // Audio requests sometimes include a Range header for streaming.
+        // These are best handled directly by the network to avoid issues
+        // with partial content and cache lookups.
+        if (event.request.headers.has('range')) {
+            event.respondWith(fetch(event.request));
+            return;
+        }
+
         event.respondWith(
             caches.match(event.request).then((cachedResponse) => {
                 if (cachedResponse) {
