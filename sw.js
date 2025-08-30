@@ -10,6 +10,7 @@ const SHELL_ASSETS = [
 // IndexedDB setup ----------------------------------------------------------
 const DB_NAME = 'base3';
 const DB_VERSION = 1;
+const inFlight = new Map(); // url -> {controller, lastPostTs}
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -182,12 +183,28 @@ self.addEventListener('message', (event) => {
         event.source?.postMessage({ status: hit ? 'saved' : 'removed', url, ...(hit || {}) });
       })
     );
+  } else if (action === 'abort') {
+    const rec = inFlight.get(url);
+    if (rec) rec.controller.abort('user-abort');
+    event.source?.postMessage({ status: 'removed', url });
   }
 });
 
 async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
-  const res = await fetch(urlStr);
+  const controller = new AbortController();
+  inFlight.set(urlStr, { controller, lastPostTs: 0 });
+  let res;
+  try {
+    res = await fetch(urlStr, { signal: controller.signal });
+  } catch (err) {
+    inFlight.delete(urlStr);
+    if (err.name === 'AbortError') return;
+    sourceClient?.postMessage({ status: 'error', url: urlStr });
+    return;
+  }
+
   if (!res.ok || !res.body) {
+    inFlight.delete(urlStr);
     sourceClient?.postMessage({ status: 'error', url: urlStr });
     return;
   }
@@ -202,23 +219,39 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
   const url = new URL(urlStr, self.location.origin);
   const key = url.pathname;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.byteLength;
-    sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
-    await idbPut(db, 'downloads', {
-      trackKey: key,
-      state: 'downloading',
-      received,
-      size,
-      updatedAt: Date.now()
-    });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.byteLength;
+      const rec = inFlight.get(urlStr);
+      const now = performance.now();
+      if (rec && now - rec.lastPostTs >= 120) {
+        sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
+        rec.lastPostTs = now;
+      }
+      await idbPut(db, 'downloads', {
+        trackKey: key,
+        state: 'downloading',
+        received,
+        size,
+        updatedAt: Date.now()
+      });
+    }
+  } catch (err) {
+    inFlight.delete(urlStr);
+    if (err.name === 'AbortError') {
+      await idbDelete(db, 'downloads', key);
+      return;
+    }
+    sourceClient?.postMessage({ status: 'error', url: urlStr });
+    return;
   }
 
   const blob = new Blob(chunks, { type: mime });
   await saveBlobToIDB(db, key, mime, blob);
+  inFlight.delete(urlStr);
   sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
 }
 

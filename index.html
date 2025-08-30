@@ -164,6 +164,10 @@
   <section id="debug-tools" style="width:90%;max-width:400px;margin-top:20px;background:#333;padding:10px;border-radius:5px;">
     <h2 style="margin-top:0;">Debug Tools</h2>
     <p id="online-status" style="margin:5px 0;">Status: Unknown</p>
+    <p id="db-info" style="margin:5px 0;">DB: n/a</p>
+    <p id="offline-total" style="margin:5px 0;">Offline: 0 tracks, 0 MB</p>
+    <button id="recalc-offline">Recalculate offline size</button>
+    <ul id="offline-list" style="list-style:none;padding-left:0;margin-top:10px;"></ul>
     <button id="refresh-cache">Refresh Cache List</button>
     <button id="clear-cache">Clear All Caches</button>
     <ul id="cache-list" style="list-style:none;padding-left:0;max-height:150px;overflow-y:auto;margin-top:10px;"></ul>
@@ -182,7 +186,9 @@
   </footer>
 
   <!-- JavaScript for enhanced controls -->
-  <script>
+  <script type="module">
+    import { wireAudio, resumeIfPossible } from './player-state.js';
+
     document.addEventListener('DOMContentLoaded', () => {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
@@ -204,7 +210,23 @@
       const trackContainers = document.querySelectorAll('.track');
       const saveButtons = document.querySelectorAll('.save-offline');
       const removeButtons = document.querySelectorAll('.remove-offline');
+      const offlineMap = new Map();
+      const offlineTotal = document.getElementById('offline-total');
+      const offlineList = document.getElementById('offline-list');
+      const recalcBtn = document.getElementById('recalc-offline');
+      const dbInfo = document.getElementById('db-info');
       let currentIndex = 0;
+      let persistenceTried = false;
+
+      const toKey = a => new URL(a.currentSrc || a.src || a.querySelector('source')?.src || '', location.href).pathname;
+      tracks.forEach(t => wireAudio(t, toKey));
+      tracks.forEach(t => resumeIfPossible(t));
+
+      const dbReq = indexedDB.open('base3');
+      dbReq.onsuccess = () => {
+        dbInfo.textContent = `DB: v${dbReq.result.version}`;
+        dbReq.result.close();
+      };
 
       const swReady = 'serviceWorker' in navigator
         ? new Promise(resolve => {
@@ -223,9 +245,35 @@
         });
       }
 
+      function showToast(msg) {
+        const div = document.createElement('div');
+        div.textContent = msg;
+        div.style.position = 'fixed';
+        div.style.bottom = '10px';
+        div.style.left = '50%';
+        div.style.transform = 'translateX(-50%)';
+        div.style.background = '#333';
+        div.style.padding = '6px 10px';
+        div.style.borderRadius = '4px';
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 3000);
+      }
+
       saveButtons.forEach(button => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
+          if (button.dataset.state === 'saving') {
+            sendToServiceWorker('abort', button.dataset.url);
+            return;
+          }
+          if (!persistenceTried) {
+            persistenceTried = true;
+            let granted = false;
+            try { granted = await navigator.storage?.persist?.(); } catch (e) {}
+            showToast(granted ? 'Storage will be kept when possible.' : 'Storage may be cleared by the browser.');
+          }
           sendToServiceWorker('save', button.dataset.url);
+          button.dataset.state = 'saving';
+          button.textContent = 'Cancel';
         });
       });
 
@@ -237,10 +285,34 @@
         });
       });
 
+      function updateDiagnostics() {
+        let bytes = 0;
+        offlineList.innerHTML = '';
+        saveButtons.forEach(btn => {
+          const url = btn.dataset.url;
+          const size = offlineMap.get(url) || 0;
+          if (size) bytes += size;
+          const li = document.createElement('li');
+          li.textContent = `${url} - ${size ? 'saved' : 'unsaved'}`;
+          const rmBtn = document.createElement('button');
+          rmBtn.textContent = 'Remove';
+          rmBtn.disabled = !size;
+          rmBtn.addEventListener('click', () => sendToServiceWorker('remove', url));
+          li.appendChild(rmBtn);
+          offlineList.appendChild(li);
+        });
+        offlineTotal.textContent = `Offline: ${offlineMap.size} tracks, ${(bytes / 1e6).toFixed(2)} MB`;
+      }
+
+      recalcBtn.addEventListener('click', () => {
+        saveButtons.forEach(btn => sendToServiceWorker('check', btn.dataset.url));
+      });
+
       // Check cache status on load
       saveButtons.forEach(button => {
         sendToServiceWorker('check', button.dataset.url);
       });
+      updateDiagnostics();
 
       let _lastProgressAt = 0;
       if ('serviceWorker' in navigator) {
@@ -257,29 +329,37 @@
             _lastProgressAt = now;
 
             const pct = size ? Math.round((received / size) * 100) : 0;
-            saveBtn.textContent = `Saving ${pct}%`;
-            saveBtn.disabled = true;
-            saveBtn.classList.add('disabled');
+            saveBtn.textContent = `Cancel ${pct}%`;
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('disabled');
+            saveBtn.dataset.state = 'saving';
             return;
           }
 
+          saveBtn.dataset.state = '';
+
           if (status === 'saved') {
+            offlineMap.set(url, size);
             saveBtn.textContent = 'Saved';
             saveBtn.disabled = true;
             saveBtn.classList.add('disabled');
             removeBtn.disabled = false;
             removeBtn.classList.remove('disabled');
           } else if (status === 'removed') {
+            offlineMap.delete(url);
             saveBtn.textContent = 'Save for offline';
             saveBtn.disabled = false;
             saveBtn.classList.remove('disabled');
             removeBtn.disabled = true;
             removeBtn.classList.add('disabled');
           } else if (status === 'error') {
+            offlineMap.delete(url);
             saveBtn.textContent = 'Error';
             saveBtn.disabled = false;
             saveBtn.classList.remove('disabled');
           }
+
+          updateDiagnostics();
         });
       }
 
