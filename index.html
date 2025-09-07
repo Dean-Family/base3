@@ -53,8 +53,8 @@
     <div class="track-info">01. Lead with Your Hips</div>
     <a class="download-link" href="music/Lead_with_Your_Hips.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Lead_with_Your_Hips.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Lead_with_Your_Hips.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Lead_with_Your_Hips.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -66,8 +66,8 @@
     <div class="track-info">02. Midnight Attitude</div>
     <a class="download-link" href="music/Midnight_Attitude.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Midnight_Attitude.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Midnight_Attitude.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Midnight_Attitude.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -79,8 +79,8 @@
     <div class="track-info">03. Full Capacity</div>
     <a class="download-link" href="music/Full_Capacity.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Full_Capacity.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Full_Capacity.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Full_Capacity.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -92,8 +92,8 @@
     <div class="track-info">04. Deep Sleep</div>
     <a class="download-link" href="music/Deep_Sleep.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Deep_Sleep.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Deep_Sleep.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Deep_Sleep.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -105,8 +105,8 @@
     <div class="track-info">05. Level 9</div>
     <a class="download-link" href="music/Level_9.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Level_9.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Level_9.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Level_9.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -118,8 +118,8 @@
     <div class="track-info">06. windy</div>
     <a class="download-link" href="music/windy.m4a" download>Download M4A</a>
     <a class="download-link" href="music/windy.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/windy.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/windy.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -131,8 +131,8 @@
     <div class="track-info">07. T-Rex T-Rex</div>
     <a class="download-link" href="music/T-Rex_T-Rex.m4a" download>Download M4A</a>
     <a class="download-link" href="music/T-Rex_T-Rex.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/T-Rex_T-Rex.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/T-Rex_T-Rex.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -144,8 +144,8 @@
     <div class="track-info">08. Walking on the C</div>
     <a class="download-link" href="music/Walking_on_the_C.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Walking_on_the_C.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Walking_on_the_C.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Walking_on_the_C.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <div class="track">
@@ -157,8 +157,8 @@
     <div class="track-info">09. Won 2 1</div>
     <a class="download-link" href="music/Won_2_1.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Won_2_1.wav" download>Download WAV</a>
-    <button class="save-offline" data-url="/music/Won_2_1.m4a">Save for offline</button>
-    <button class="remove-offline" data-url="/music/Won_2_1.m4a">Remove from offline</button>
+    <button class="save-offline">Save for offline</button>
+    <button class="remove-offline">Remove from offline</button>
   </div>
 
   <section id="debug-tools" style="width:90%;max-width:400px;margin-top:20px;background:#333;padding:10px;border-radius:5px;">
@@ -265,8 +265,14 @@
 
       saveButtons.forEach(button => {
         button.addEventListener('click', async () => {
+          const audio = button.closest('.track').querySelector('audio');
+          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          if (!url || url === location.pathname) {
+            showToast('No audio source available');
+            return;
+          }
           if (button.dataset.state === 'saving') {
-            sendToServiceWorker('abort', button.dataset.url);
+            sendToServiceWorker('abort', url);
             return;
           }
           if (!persistenceTried) {
@@ -275,7 +281,7 @@
             try { granted = await navigator.storage?.persist?.(); } catch (e) {}
             showToast(granted ? 'Storage will be kept when possible.' : 'Storage may be cleared by the browser.');
           }
-          sendToServiceWorker('save', button.dataset.url);
+          sendToServiceWorker('save', url);
           button.dataset.state = 'saving';
           button.textContent = 'Cancel';
         });
@@ -285,7 +291,9 @@
         button.disabled = true;
         button.classList.add('disabled');
         button.addEventListener('click', () => {
-          sendToServiceWorker('remove', button.dataset.url);
+          const audio = button.closest('.track').querySelector('audio');
+          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          sendToServiceWorker('remove', url);
         });
       });
 
@@ -293,7 +301,8 @@
         let bytes = 0;
         offlineList.innerHTML = '';
         saveButtons.forEach(btn => {
-          const url = btn.dataset.url;
+          const audio = btn.closest('.track').querySelector('audio');
+          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
           const size = offlineMap.get(url) || 0;
           if (size) bytes += size;
           const li = document.createElement('li');
@@ -309,12 +318,18 @@
       }
 
       recalcBtn.addEventListener('click', () => {
-        saveButtons.forEach(btn => sendToServiceWorker('check', btn.dataset.url));
+        saveButtons.forEach(btn => {
+          const audio = btn.closest('.track').querySelector('audio');
+          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          sendToServiceWorker('check', url);
+        });
       });
 
       // Check cache status on load
       saveButtons.forEach(button => {
-        sendToServiceWorker('check', button.dataset.url);
+        const audio = button.closest('.track').querySelector('audio');
+        const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+        sendToServiceWorker('check', url);
       });
       updateDiagnostics();
 
@@ -323,8 +338,15 @@
         navigator.serviceWorker.addEventListener('message', (event) => {
           const { status, url, received, size } = event.data || {};
           if (!status || !url) return;
-          const saveBtn = document.querySelector(`button.save-offline[data-url="${url}"]`);
-          const removeBtn = document.querySelector(`button.remove-offline[data-url="${url}"]`);
+          let saveBtn, removeBtn;
+          saveButtons.forEach(btn => {
+            const audio = btn.closest('.track').querySelector('audio');
+            const audioUrl = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+            if (audioUrl === url) {
+              saveBtn = btn;
+              removeBtn = btn.closest('.track').querySelector('.remove-offline');
+            }
+          });
           if (!saveBtn || !removeBtn) return;
 
           if (status === 'downloading') {
