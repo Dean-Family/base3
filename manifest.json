@@ -1,20 +1,23 @@
 {
   "name": "Base 3 Album Player",
   "short_name": "Base3",
-  "start_url": ".",
+  "id": "/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#222222",
   "theme_color": "#1db954",
   "icons": [
     {
-      "src": "images/Base3Logo.jpg",
+      "src": "/images/icon-192.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "images/Base3Logo.jpg",
+      "src": "/images/icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

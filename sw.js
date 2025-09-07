@@ -1,10 +1,12 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v1';
+const CACHE_NAME = 'base3-shell-v2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/images/Base3Logo.jpg'
+  '/images/icon-192.png',
+  '/images/icon-512.png',
+  '/manifest.json'
 ];
 
 // IndexedDB setup ----------------------------------------------------------
