@@ -6,7 +6,7 @@
   <meta property="og:title" content="Base 3 - Album Player" />
   <meta property="og:description" content="Listen to the tracks from Gavin's album 'Base 3' online." />
   <meta property="og:image" content="images/Base3Logo.jpg" />
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="manifest.json?v=1.2.0" />
   <meta name="theme-color" content="#1db954" />
   <title>Base 3 - Album Player</title>
   <style>
@@ -182,7 +182,7 @@
   </noscript>
 
   <footer style="margin-top: 20px; color: #888; font-size: 0.8em;">
-    Version 1.1.2
+    Version 1.2.0 - Optimized Media
   </footer>
 
   <!-- JavaScript for enhanced controls -->
@@ -191,7 +191,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('/sw.js?v=1.2.0')
           .then(reg => console.log('Service Worker registered:', reg.scope))
           .catch(err => console.log('Service Worker registration failed:', err));
       }
