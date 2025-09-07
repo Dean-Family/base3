@@ -289,8 +289,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     if (err.name === 'QuotaExceededError') {
       let info;
       try {
-        if (navigator.storage && navigator.storage.estimate) {
-          const est = await navigator.storage.estimate();
+        const nav = self.navigator;
+        if (nav && nav.storage && nav.storage.estimate) {
+          const est = await nav.storage.estimate();
           info = { usage: est.usage, quota: est.quota };
         }
       } catch (e) {
