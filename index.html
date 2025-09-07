@@ -211,6 +211,7 @@
       const saveButtons = document.querySelectorAll('.save-offline');
       const removeButtons = document.querySelectorAll('.remove-offline');
       const offlineMap = new Map();
+      const offlineTimers = new Map();
       const offlineTotal = document.getElementById('offline-total');
       const offlineList = document.getElementById('offline-list');
       const recalcBtn = document.getElementById('recalc-offline');
@@ -273,6 +274,8 @@
           }
           if (button.dataset.state === 'saving') {
             sendToServiceWorker('abort', url);
+            clearTimeout(offlineTimers.get(url));
+            offlineTimers.delete(url);
             return;
           }
           if (!persistenceTried) {
@@ -284,6 +287,18 @@
           sendToServiceWorker('save', url);
           button.dataset.state = 'saving';
           button.textContent = 'Cancel';
+
+          clearTimeout(offlineTimers.get(url));
+          offlineTimers.set(url, setTimeout(() => {
+            offlineTimers.delete(url);
+            if (button.dataset.state === 'saving') {
+              button.dataset.state = '';
+              button.textContent = 'Save for offline';
+              button.disabled = false;
+              button.classList.remove('disabled');
+              showToast('Service worker did not respond');
+            }
+          }, 30000));
         });
       });
 
@@ -348,6 +363,11 @@
             }
           });
           if (!saveBtn || !removeBtn) return;
+
+          if (['downloading','saved','removed','error'].includes(status)) {
+            clearTimeout(offlineTimers.get(url));
+            offlineTimers.delete(url);
+          }
 
           if (status === 'downloading') {
             const now = performance.now();

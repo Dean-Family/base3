@@ -213,8 +213,8 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'network' });
     return;
   }
-  if (!res.body) {
-    // Fallback for Safari: no streaming body available
+  if (!res.body || typeof res.body.getReader !== 'function') {
+    // Fallback for Safari: ReadableStream / getReader not supported
     try {
       const mime = res.headers.get('Content-Type') || 'audio/mp4';
       const url  = new URL(urlStr, self.location.origin);
@@ -227,9 +227,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
       sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
     } catch (err) {
       inFlight.delete(urlStr);
-      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'no-body' });
+      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'no-stream' });
     }
-    return; // stop here, we handled the no-body case
+    return; // stop here, we handled the no-stream case
   }
 
   const size = Number(res.headers.get('Content-Length') || 0);
@@ -291,8 +291,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     if (err.name === 'QuotaExceededError') {
       let info;
       try {
-        if (navigator.storage && navigator.storage.estimate) {
-          const est = await navigator.storage.estimate();
+        const nav = self.navigator;
+        if (nav && nav.storage && nav.storage.estimate) {
+          const est = await nav.storage.estimate();
           info = { usage: est.usage, quota: est.quota };
         }
       } catch (e) {
