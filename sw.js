@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v1';
+const CACHE_NAME = 'base3-shell-v2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -211,8 +211,8 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'network' });
     return;
   }
-  if (!res.body) {
-    // Fallback for Safari: no streaming body available
+  if (!res.body || typeof res.body.getReader !== 'function') {
+    // Fallback for Safari: ReadableStream / getReader not supported
     try {
       const mime = res.headers.get('Content-Type') || 'audio/mp4';
       const url  = new URL(urlStr, self.location.origin);
@@ -225,9 +225,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
       sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
     } catch (err) {
       inFlight.delete(urlStr);
-      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'no-body' });
+      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'no-stream' });
     }
-    return; // stop here, we handled the no-body case
+    return; // stop here, we handled the no-stream case
   }
 
   const size = Number(res.headers.get('Content-Length') || 0);
