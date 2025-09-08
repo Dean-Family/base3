@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v13';
+const CACHE_NAME = 'base3-shell-v14';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -204,7 +204,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
   try {
     sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
     
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(urlStr, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error('Network error');
     
     const mime = res.headers.get('Content-Type') || 'audio/mp4';
