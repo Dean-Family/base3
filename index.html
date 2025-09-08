@@ -370,35 +370,37 @@
           }
 
           if (status === 'downloading') {
-            // Download large audio file with progress
-            fetch(url)
+            // Download with range requests
+            fetch(url, { method: 'HEAD' })
               .then(response => {
-                if (!response.ok) throw new Error('Network error');
-                const contentLength = response.headers.get('content-length');
-                const total = parseInt(contentLength, 10);
+                const total = parseInt(response.headers.get('content-length'), 10);
+                const chunkSize = 512 * 1024; // 512KB chunks
+                const chunks = [];
                 let loaded = 0;
                 
-                const reader = response.body.getReader();
-                const chunks = [];
-                
-                function pump() {
-                  return reader.read().then(({ done, value }) => {
-                    if (done) {
-                      const blob = new Blob(chunks);
-                      navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
-                      return;
-                    }
-                    
-                    chunks.push(value);
-                    loaded += value.byteLength;
-                    const progress = Math.round((loaded / total) * 100);
-                    saveBtn.textContent = `Cancel ${progress}%`;
-                    
-                    return pump();
+                async function downloadChunk(start, end) {
+                  const response = await fetch(url, {
+                    headers: { 'Range': `bytes=${start}-${end}` }
                   });
+                  return response.arrayBuffer();
                 }
                 
-                return pump();
+                async function downloadAll() {
+                  for (let start = 0; start < total; start += chunkSize) {
+                    const end = Math.min(start + chunkSize - 1, total - 1);
+                    const chunk = await downloadChunk(start, end);
+                    chunks.push(chunk);
+                    loaded += chunk.byteLength;
+                    
+                    const progress = Math.round((loaded / total) * 100);
+                    saveBtn.textContent = `Cancel ${progress}%`;
+                  }
+                  
+                  const blob = new Blob(chunks);
+                  navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
+                }
+                
+                return downloadAll();
               })
               .catch(err => {
                 saveBtn.textContent = 'Error';
