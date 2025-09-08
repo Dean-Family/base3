@@ -370,15 +370,23 @@
           }
 
           if (status === 'downloading') {
-            // Start actual download in main thread
-            fetch(url).then(res => res.blob()).then(blob => {
-              navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
-            }).catch(err => {
-              saveBtn.textContent = 'Error';
-              saveBtn.disabled = false;
-              saveBtn.classList.remove('disabled');
-              saveBtn.dataset.state = '';
-            });
+            // Start actual download with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+            
+            fetch(url, { signal: controller.signal })
+              .then(res => res.blob())
+              .then(blob => {
+                clearTimeout(timeoutId);
+                navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
+              })
+              .catch(err => {
+                clearTimeout(timeoutId);
+                saveBtn.textContent = 'Error';
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('disabled');
+                saveBtn.dataset.state = '';
+              });
             
             saveBtn.textContent = 'Downloading...';
             saveBtn.disabled = false;
