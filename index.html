@@ -191,7 +191,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js?v=2.1.0')
+        navigator.serviceWorker.register('/sw.js?v=2.2.0')
           .then(reg => console.log('Service Worker registered:', reg.scope))
           .catch(err => console.log('Service Worker registration failed:', err));
       }
@@ -370,12 +370,17 @@
           }
 
           if (status === 'downloading') {
-            const now = performance.now();
-            if (now - _lastProgressAt < 150) return;
-            _lastProgressAt = now;
-
-            const pct = size ? Math.round((received / size) * 100) : 0;
-            saveBtn.textContent = `Cancel ${pct}%`;
+            // Start actual download in main thread
+            fetch(url).then(res => res.blob()).then(blob => {
+              navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
+            }).catch(err => {
+              saveBtn.textContent = 'Error';
+              saveBtn.disabled = false;
+              saveBtn.classList.remove('disabled');
+              saveBtn.dataset.state = '';
+            });
+            
+            saveBtn.textContent = 'Downloading...';
             saveBtn.disabled = false;
             saveBtn.classList.remove('disabled');
             saveBtn.dataset.state = 'saving';

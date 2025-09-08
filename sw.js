@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v17';
+const CACHE_NAME = 'base3-shell-v18';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -187,11 +187,12 @@ self.addEventListener('message', (event) => {
       event.source.postMessage({ status: 'removed', url });
     });
   } else if (action === 'save') {
-    fetch(url).then(res => res.blob()).then(blob => {
-      const key = new URL(url, self.location.origin).pathname;
-      return openDB().then(db => saveBlobToIDB(db, key, 'audio/mp4', blob));
-    }).then(() => {
-      event.source.postMessage({ status: 'saved', url, received: 1000, size: 1000 });
+    event.source.postMessage({ status: 'downloading', url });
+  } else if (action === 'store') {
+    const { blob } = event.data;
+    const key = new URL(url, self.location.origin).pathname;
+    openDB().then(db => saveBlobToIDB(db, key, 'audio/mp4', blob)).then(() => {
+      event.source.postMessage({ status: 'saved', url, received: blob.size, size: blob.size });
     }).catch(err => {
       event.source.postMessage({ status: 'error', url, reason: err.message });
     });
