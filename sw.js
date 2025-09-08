@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v3';
+const CACHE_NAME = 'base3-shell-v4';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -72,16 +72,17 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async cache => {
       // Add assets individually to avoid partial response issues
-      for (const asset of SHELL_ASSETS) {
+      const cachePromises = SHELL_ASSETS.map(async asset => {
         try {
-          const response = await fetch(asset, { headers: { 'Range': '' } });
+          const response = await fetch(asset);
           if (response.ok) {
             await cache.put(asset, response);
           }
         } catch (err) {
           console.warn(`Failed to cache ${asset}:`, err);
         }
-      }
+      });
+      await Promise.allSettled(cachePromises);
     })
   );
 });
