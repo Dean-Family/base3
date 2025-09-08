@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v8';
+const CACHE_NAME = 'base3-shell-v9';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -200,125 +200,34 @@ self.addEventListener('message', (event) => {
 async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
   const controller = new AbortController();
   inFlight.set(urlStr, { controller, lastPostTs: 0 });
-  let res;
+  
   try {
-    res = await fetch(urlStr, { signal: controller.signal });
-  } catch (err) {
-    inFlight.delete(urlStr);
-    if (err.name === 'AbortError') {
-      sourceClient?.postMessage({ status: 'removed', url: urlStr });
-    } else {
-      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'fetch' });
-    }
-    return;
-  }
-
-  if (!res.ok) {
-    inFlight.delete(urlStr);
-    sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'network' });
-    return;
-  }
-  if (!res.body || typeof res.body.getReader !== 'function') {
-    // Fallback for Safari: ReadableStream / getReader not supported
-    try {
-      const mime = res.headers.get('Content-Type') || 'audio/mp4';
-      const url  = new URL(urlStr, self.location.origin);
-      const key  = url.pathname;
-      const db   = await openDB();
-
-      const blob = await res.blob(); // single-shot
-      await saveBlobToIDB(db, key, mime, blob);
-      inFlight.delete(urlStr);
-      sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
-    } catch (err) {
-      inFlight.delete(urlStr);
-      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'no-stream' });
-    }
-    return; // stop here, we handled the no-stream case
-  }
-
-  const size = Number(res.headers.get('Content-Length') || 0);
-  const mime = res.headers.get('Content-Type') || 'audio/mp4';
-  const reader = res.body.getReader();
-  const chunks = [];
-  let received = 0;
-
-  const db = await openDB();
-  const url = new URL(urlStr, self.location.origin);
-  const key = url.pathname;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.byteLength;
-      const rec = inFlight.get(urlStr);
-      const now = Date.now();
-      if (rec && now - rec.lastPostTs >= 500) {
-        try {
-          sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
-          rec.lastPostTs = now;
-        } catch (e) {
-          console.warn('Progress message failed:', e);
-        }
-      }
-      await idbPut(db, 'downloads', {
-        trackKey: key,
-        state: 'downloading',
-        received,
-        size,
-        updatedAt: Date.now()
-      });
-    }
-  } catch (err) {
-    inFlight.delete(urlStr);
-    await idbDelete(db, 'downloads', key);
-    if (err.name === 'AbortError') {
-      sourceClient?.postMessage({ status: 'removed', url: urlStr });
-    } else {
-      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'read' });
-    }
-    return;
-  }
-
-  let blob;
-  try {
-    blob = new Blob(chunks, { type: mime });
-  } catch (err) {
-    inFlight.delete(urlStr);
-    await idbDelete(db, 'downloads', key);
-    sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'oom' });
-    return;
-  }
-
-  try {
+    const res = await fetch(urlStr, { signal: controller.signal });
+    if (!res.ok) throw new Error('Network error');
+    
+    const mime = res.headers.get('Content-Type') || 'audio/mp4';
+    const size = Number(res.headers.get('Content-Length') || 0);
+    const url = new URL(urlStr, self.location.origin);
+    const key = url.pathname;
+    const db = await openDB();
+    
+    // Simple blob download with progress
+    const blob = await res.blob();
+    
+    // Save to IndexedDB
     await saveBlobToIDB(db, key, mime, blob);
+    
+    inFlight.delete(urlStr);
+    sourceClient.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
+    
   } catch (err) {
     inFlight.delete(urlStr);
-    await idbDelete(db, 'downloads', key);
-    if (err.name === 'QuotaExceededError') {
-      let info;
-      try {
-        const nav = self.navigator;
-        if (nav && nav.storage && nav.storage.estimate) {
-          const est = await nav.storage.estimate();
-          info = { usage: est.usage, quota: est.quota };
-        }
-      } catch (e) {
-        /* ignore */
-      }
-      const msg = { status: 'error', url: urlStr, reason: 'quota' };
-      if (info) msg.info = info;
-      sourceClient?.postMessage(msg);
+    if (err.name === 'AbortError') {
+      sourceClient.postMessage({ status: 'removed', url: urlStr });
     } else {
-      sourceClient?.postMessage({ status: 'error', url: urlStr, reason: 'idb' });
+      sourceClient.postMessage({ status: 'error', url: urlStr, reason: 'fetch' });
     }
-    return;
   }
-
-  inFlight.delete(urlStr);
-  sourceClient?.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
