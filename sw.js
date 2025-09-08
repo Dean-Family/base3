@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v10';
+const CACHE_NAME = 'base3-shell-v11';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -232,21 +232,19 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  await idbPut(db, 'tracks', {
-    trackKey: key,
-    urlPath: key,
-    mime,
-    size: blob.size,
-    blob,
-    downloadedAt: Date.now()
-  });
-  await idbPut(db, 'downloads', {
-    trackKey: key,
-    state: 'downloaded',
-    received: blob.size,
-    size: blob.size,
-    updatedAt: Date.now()
-  });
+  try {
+    await idbPut(db, 'tracks', {
+      trackKey: key,
+      urlPath: key,
+      mime,
+      size: blob.size,
+      blob,
+      downloadedAt: Date.now()
+    });
+  } catch (e) {
+    console.error('Failed to save to tracks store:', e);
+    throw e;
+  }
 }
 
 async function removeAudioFromIDB(urlStr) {
