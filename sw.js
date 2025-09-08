@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v7';
+const CACHE_NAME = 'base3-shell-v8';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -175,33 +175,25 @@ self.addEventListener('fetch', (event) => {
 
 // Messaging ---------------------------------------------------------------
 self.addEventListener('message', (event) => {
-  console.log('SW received message:', event.data);
   const { action, url } = event.data || {};
-  if (!action || !url) {
-    console.warn('SW: Invalid message data');
-    return;
-  }
+  if (!action || !url) return;
 
-  if (action === 'save') {
-    event.waitUntil(saveAudioToIDBWithProgress(url, event.source));
+  if (action === 'check') {
+    hasAudioInIDB(url).then((hit) => {
+      event.source.postMessage({ status: hit ? 'saved' : 'removed', url });
+    }).catch(() => {
+      event.source.postMessage({ status: 'removed', url });
+    });
+  } else if (action === 'save') {
+    saveAudioToIDBWithProgress(url, event.source);
   } else if (action === 'remove') {
-    event.waitUntil(
-      removeAudioFromIDB(url).then(() => {
-        event.source?.postMessage({ status: 'removed', url });
-      })
-    );
-  } else if (action === 'check') {
-    event.waitUntil(
-      hasAudioInIDB(url).then((hit) => {
-        const response = { status: hit ? 'saved' : 'removed', url, ...(hit || {}) };
-        console.log('SW sending check response:', response);
-        event.source?.postMessage(response);
-      })
-    );
+    removeAudioFromIDB(url).then(() => {
+      event.source.postMessage({ status: 'removed', url });
+    });
   } else if (action === 'abort') {
     const rec = inFlight.get(url);
-    if (rec) rec.controller.abort('user-abort');
-    event.source?.postMessage({ status: 'removed', url });
+    if (rec) rec.controller.abort();
+    event.source.postMessage({ status: 'removed', url });
   }
 });
 
