@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v15';
+const CACHE_NAME = 'base3-shell-v16';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -178,14 +178,16 @@ self.addEventListener('message', (event) => {
   const { action, url } = event.data || {};
   if (!action || !url) return;
 
-  if (action === 'check') {
+  if (action === 'test') {
+    event.source.postMessage({ status: 'test-ok', url });
+  } else if (action === 'check') {
     hasAudioInIDB(url).then((hit) => {
       event.source.postMessage({ status: hit ? 'saved' : 'removed', url });
     }).catch(() => {
       event.source.postMessage({ status: 'removed', url });
     });
   } else if (action === 'save') {
-    saveAudioToIDBWithProgress(url, event.source);
+    event.source.postMessage({ status: 'saved', url, received: 100, size: 100 });
   } else if (action === 'remove') {
     removeAudioFromIDB(url).then(() => {
       event.source.postMessage({ status: 'removed', url });
