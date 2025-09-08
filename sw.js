@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v6';
+const CACHE_NAME = 'base3-shell-v7';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -262,10 +262,14 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
       chunks.push(value);
       received += value.byteLength;
       const rec = inFlight.get(urlStr);
-      const now = self.performance?.now?.() || Date.now();
-      if (rec && now - rec.lastPostTs >= 120) {
-        sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
-        rec.lastPostTs = now;
+      const now = Date.now();
+      if (rec && now - rec.lastPostTs >= 500) {
+        try {
+          sourceClient?.postMessage({ status: 'downloading', url: urlStr, received, size });
+          rec.lastPostTs = now;
+        } catch (e) {
+          console.warn('Progress message failed:', e);
+        }
       }
       await idbPut(db, 'downloads', {
         trackKey: key,
