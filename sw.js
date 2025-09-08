@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v11';
+const CACHE_NAME = 'base3-shell-v12';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -11,7 +11,7 @@ const SHELL_ASSETS = [
 
 // IndexedDB setup ----------------------------------------------------------
 const DB_NAME = 'base3';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const inFlight = new Map(); // url -> {controller, lastPostTs}
 
 function openDB() {
