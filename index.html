@@ -13,10 +13,12 @@
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; background-color: #222; color: #fff; }
     .logo { margin-top: 20px; width: 80%; max-width: 400px; border-radius: 10px; }
     .track { width: 90%; margin: 10px 0; padding: 10px; background: #333; border-radius: 5px; display: flex; flex-direction: column; align-items: center; }
-    .track.active { border: 2px solid #1db954; background: #444; }
+    /* Darker background for active tracks to maintain link contrast */
+    .track.active { border: 2px solid #1db954; background: #2b2b2b; }
     .track audio { width: 100%; }
     .track-info { margin-top: 8px; }
-    .download-link { color: #1db954; text-decoration: none; font-weight: bold; margin-top: 5px; }
+    /* Brighter green ensures sufficient contrast on all backgrounds */
+    .download-link { color: #1ed760; text-decoration: none; font-weight: bold; margin-top: 5px; }
     .download-link:hover { text-decoration: underline; }
     button { padding: 10px 20px; margin: 10px; background-color: #1db954; border: none; color: white; cursor: pointer; border-radius: 5px; }
     button.disabled { background-color: #555; cursor: not-allowed; }
@@ -181,7 +183,8 @@
     </p>
   </noscript>
 
-  <footer style="margin-top: 20px; color: #888; font-size: 0.8em;">
+  <!-- Lighter footer text for better contrast on dark background -->
+  <footer style="margin-top: 20px; color: #aaa; font-size: 0.8em;">
     Version 1.2.0 - Optimized Media
   </footer>
 
