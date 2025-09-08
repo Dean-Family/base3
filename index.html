@@ -370,18 +370,37 @@
           }
 
           if (status === 'downloading') {
-            // Start actual download with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-            
-            fetch(url, { signal: controller.signal })
-              .then(res => res.blob())
-              .then(blob => {
-                clearTimeout(timeoutId);
-                navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
+            // Download large audio file with progress
+            fetch(url)
+              .then(response => {
+                if (!response.ok) throw new Error('Network error');
+                const contentLength = response.headers.get('content-length');
+                const total = parseInt(contentLength, 10);
+                let loaded = 0;
+                
+                const reader = response.body.getReader();
+                const chunks = [];
+                
+                function pump() {
+                  return reader.read().then(({ done, value }) => {
+                    if (done) {
+                      const blob = new Blob(chunks);
+                      navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
+                      return;
+                    }
+                    
+                    chunks.push(value);
+                    loaded += value.byteLength;
+                    const progress = Math.round((loaded / total) * 100);
+                    saveBtn.textContent = `Cancel ${progress}%`;
+                    
+                    return pump();
+                  });
+                }
+                
+                return pump();
               })
               .catch(err => {
-                clearTimeout(timeoutId);
                 saveBtn.textContent = 'Error';
                 saveBtn.disabled = false;
                 saveBtn.classList.remove('disabled');
