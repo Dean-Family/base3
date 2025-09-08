@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v12';
+const CACHE_NAME = 'base3-shell-v13';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -202,6 +202,8 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
   inFlight.set(urlStr, { controller, lastPostTs: 0 });
   
   try {
+    sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
+    
     const res = await fetch(urlStr, { signal: controller.signal });
     if (!res.ok) throw new Error('Network error');
     
@@ -211,17 +213,13 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     const key = url.pathname;
     const db = await openDB();
     
-    // Simple blob download with progress
     const blob = await res.blob();
-    
-    // Save to IndexedDB
     await saveBlobToIDB(db, key, mime, blob);
     
     inFlight.delete(urlStr);
     sourceClient.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
     
   } catch (err) {
-    console.error('Save error:', err);
     inFlight.delete(urlStr);
     if (err.name === 'AbortError') {
       sourceClient.postMessage({ status: 'removed', url: urlStr });
