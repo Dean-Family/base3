@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v4';
+const CACHE_NAME = 'base3-shell-v5';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -69,22 +69,16 @@ function idbDelete(db, store, key) {
 // Caching the application shell -------------------------------------------
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(async cache => {
-      // Add assets individually to avoid partial response issues
-      const cachePromises = SHELL_ASSETS.map(async asset => {
-        try {
-          const response = await fetch(asset);
-          if (response.ok) {
-            await cache.put(asset, response);
-          }
-        } catch (err) {
-          console.warn(`Failed to cache ${asset}:`, err);
-        }
-      });
-      await Promise.allSettled(cachePromises);
-    })
-  );
+  // Cache shell assets in background, don't block install
+  caches.open(CACHE_NAME).then(async cache => {
+    for (const asset of SHELL_ASSETS) {
+      try {
+        await cache.add(asset);
+      } catch (err) {
+        console.warn(`Failed to cache ${asset}:`, err);
+      }
+    }
+  }).catch(err => console.warn('Shell caching failed:', err));
 });
 
 self.addEventListener('activate', event => {
