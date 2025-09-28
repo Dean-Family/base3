@@ -243,8 +243,12 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  try {
+  return new Promise((resolve, reject) => {
     console.log('Saving to IDB:', key, mime, blob.size);
+    
+    const tx = db.transaction('tracks', 'readwrite');
+    const store = tx.objectStore('tracks');
+    
     const record = {
       trackKey: key,
       urlPath: key,
@@ -253,29 +257,29 @@ async function saveBlobToIDB(db, key, mime, blob) {
       blob,
       downloadedAt: Date.now()
     };
-    console.log('Record created, calling idbPut with timeout...');
     
-    const savePromise = idbPut(db, 'tracks', record);
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('IDB save timeout')), 10000)
-    );
+    console.log('Starting IDB transaction...');
+    const request = store.put(record);
     
-    try {
-      await Promise.race([savePromise, timeoutPromise]);
-      console.log('idbPut completed successfully');
-    } catch (err) {
-      if (err.message === 'IDB save timeout') {
-        console.log('First save timed out, retrying...');
-        await idbPut(db, 'tracks', record); // Retry once
-        console.log('Retry save completed successfully');
-      } else {
-        throw err;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to save to tracks store:', e);
-    throw e;
-  }
+    request.onsuccess = () => {
+      console.log('IDB save successful');
+      resolve();
+    };
+    
+    request.onerror = () => {
+      console.error('IDB save failed:', request.error);
+      reject(request.error);
+    };
+    
+    tx.oncomplete = () => {
+      console.log('IDB transaction completed');
+    };
+    
+    tx.onerror = () => {
+      console.error('IDB transaction failed:', tx.error);
+      reject(tx.error);
+    };
+  });
 }
 
 async function removeAudioFromIDB(urlStr) {
