@@ -246,37 +246,19 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  console.log('Saving blob in chunks:', key, blob.size);
+  console.log('Testing simple metadata save:', key, blob.size);
   
-  const chunkSize = 256 * 1024; // 256KB chunks
-  const totalChunks = Math.ceil(blob.size / chunkSize);
-  
-  // Save metadata first
+  // Just save metadata for now - test if idbPut works at all
   await idbPut(db, 'tracks', {
     trackKey: key,
     urlPath: key,
     mime,
     size: blob.size,
-    totalChunks,
     downloadedAt: Date.now()
+    // No blob or chunks - just metadata
   });
   
-  // Save chunks
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, blob.size);
-    const chunk = blob.slice(start, end);
-    
-    await idbPut(db, 'chunks', {
-      trackKey: key,
-      chunkIndex: i,
-      data: chunk
-    });
-    
-    console.log(`Saved chunk ${i + 1}/${totalChunks}`);
-  }
-  
-  console.log('All chunks saved successfully');
+  console.log('Metadata saved successfully');
 }
 
 async function removeAudioFromIDB(urlStr) {
