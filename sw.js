@@ -209,27 +209,8 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     const res = await fetch(urlStr, { signal: controller.signal });
     if (!res.ok) throw new Error('Network error');
     
-    const size = Number(res.headers.get('Content-Length') || 0);
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
+    const blob = await res.blob();
     
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      chunks.push(value);
-      received += value.byteLength;
-      
-      const now = performance.now();
-      const lastPost = inFlight.get(urlStr)?.lastPostTs || 0;
-      if (now - lastPost > 200) {
-        sourceClient.postMessage({ status: 'downloading', url: urlStr, received, size });
-        inFlight.set(urlStr, { controller, lastPostTs: now });
-      }
-    }
-    
-    const blob = new Blob(chunks);
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
     const db = await openDB();
