@@ -224,8 +224,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     const db = await openDB();
     console.log('DB opened, saving blob:', blob.size, 'bytes');
     
-    // Skip actual IDB save for now - just test UI flow
-    console.log('Skipping IDB save, marking as complete');
+    // Real IDB save
+    await saveBlobToIDB(db, key, 'audio/mp4', blob);
+    console.log('Real IDB save completed');
     
     console.log('About to send saved message...');
     inFlight.delete(urlStr);
@@ -252,9 +253,43 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  // Skip actual save for testing
-  console.log('Fake save completed for:', key);
-  return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    console.log('Real IDB save starting:', key, blob.size);
+    
+    const tx = db.transaction('tracks', 'readwrite');
+    const store = tx.objectStore('tracks');
+    
+    const record = {
+      trackKey: key,
+      urlPath: key,
+      mime,
+      size: blob.size,
+      blob: blob, // Store the actual blob
+      downloadedAt: Date.now()
+    };
+    
+    console.log('Putting record in IDB...');
+    const request = store.put(record);
+    
+    request.onsuccess = () => {
+      console.log('IDB put request succeeded');
+    };
+    
+    request.onerror = () => {
+      console.error('IDB put request failed:', request.error);
+      reject(request.error);
+    };
+    
+    tx.oncomplete = () => {
+      console.log('IDB transaction completed successfully');
+      resolve();
+    };
+    
+    tx.onerror = () => {
+      console.error('IDB transaction failed:', tx.error);
+      reject(tx.error);
+    };
+  });
 }
 
 async function removeAudioFromIDB(urlStr) {
