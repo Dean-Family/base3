@@ -215,7 +215,12 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     let received = 0;
     
     while (true) {
-      const { done, value } = await reader.read();
+      const readPromise = reader.read();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Read timeout')), 5000)
+      );
+      
+      const { done, value } = await Promise.race([readPromise, timeoutPromise]);
       if (done) break;
       
       chunks.push(value);
