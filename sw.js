@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v19';
+const CACHE_NAME = 'base3-shell-v20';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
