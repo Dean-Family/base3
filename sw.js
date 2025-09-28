@@ -8,7 +8,7 @@ const SHELL_ASSETS = [
 
 // IndexedDB setup ----------------------------------------------------------
 const DB_NAME = 'base3';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const inFlight = new Map(); // url -> {controller, lastPostTs}
 
 function openDB() {
@@ -19,6 +19,9 @@ function openDB() {
       const db = req.result;
       if (!db.objectStoreNames.contains('tracks')) {
         db.createObjectStore('tracks', { keyPath: 'trackKey' });
+      }
+      if (!db.objectStoreNames.contains('chunks')) {
+        db.createObjectStore('chunks', { keyPath: ['trackKey', 'chunkIndex'] });
       }
       if (!db.objectStoreNames.contains('downloads')) {
         db.createObjectStore('downloads', { keyPath: 'trackKey' });
@@ -243,43 +246,37 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  return new Promise((resolve, reject) => {
-    console.log('Saving to IDB:', key, mime, blob.size);
-    
-    const tx = db.transaction('tracks', 'readwrite');
-    const store = tx.objectStore('tracks');
-    
-    const record = {
-      trackKey: key,
-      urlPath: key,
-      mime,
-      size: blob.size,
-      blob,
-      downloadedAt: Date.now()
-    };
-    
-    console.log('Starting IDB transaction...');
-    const request = store.put(record);
-    
-    request.onsuccess = () => {
-      console.log('IDB save successful');
-      resolve();
-    };
-    
-    request.onerror = () => {
-      console.error('IDB save failed:', request.error);
-      reject(request.error);
-    };
-    
-    tx.oncomplete = () => {
-      console.log('IDB transaction completed');
-    };
-    
-    tx.onerror = () => {
-      console.error('IDB transaction failed:', tx.error);
-      reject(tx.error);
-    };
+  console.log('Saving blob in chunks:', key, blob.size);
+  
+  const chunkSize = 256 * 1024; // 256KB chunks
+  const totalChunks = Math.ceil(blob.size / chunkSize);
+  
+  // Save metadata first
+  await idbPut(db, 'tracks', {
+    trackKey: key,
+    urlPath: key,
+    mime,
+    size: blob.size,
+    totalChunks,
+    downloadedAt: Date.now()
   });
+  
+  // Save chunks
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, blob.size);
+    const chunk = blob.slice(start, end);
+    
+    await idbPut(db, 'chunks', {
+      trackKey: key,
+      chunkIndex: i,
+      data: chunk
+    });
+    
+    console.log(`Saved chunk ${i + 1}/${totalChunks}`);
+  }
+  
+  console.log('All chunks saved successfully');
 }
 
 async function removeAudioFromIDB(urlStr) {
