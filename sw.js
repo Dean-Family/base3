@@ -1,6 +1,6 @@
 // sw.js - Service Worker using IndexedDB for audio storage
 
-const CACHE_NAME = 'base3-shell-v18';
+const CACHE_NAME = 'base3-shell-v19';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -187,15 +187,7 @@ self.addEventListener('message', (event) => {
       event.source.postMessage({ status: 'removed', url });
     });
   } else if (action === 'save') {
-    event.source.postMessage({ status: 'downloading', url });
-  } else if (action === 'store') {
-    const { blob } = event.data;
-    const key = new URL(url, self.location.origin).pathname;
-    openDB().then(db => saveBlobToIDB(db, key, 'audio/mp4', blob)).then(() => {
-      event.source.postMessage({ status: 'saved', url, received: blob.size, size: blob.size });
-    }).catch(err => {
-      event.source.postMessage({ status: 'error', url, reason: err.message });
-    });
+    saveAudioToIDBWithProgress(url, event.source);
   } else if (action === 'remove') {
     removeAudioFromIDB(url).then(() => {
       event.source.postMessage({ status: 'removed', url });
@@ -208,22 +200,52 @@ self.addEventListener('message', (event) => {
 });
 
 async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
-  inFlight.set(urlStr, { controller: null, lastPostTs: 0 });
+  const controller = new AbortController();
+  inFlight.set(urlStr, { controller, lastPostTs: 0 });
   
   try {
+    sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
+    
+    const res = await fetch(urlStr, { signal: controller.signal });
+    if (!res.ok) throw new Error('Network error');
+    
+    const size = Number(res.headers.get('Content-Length') || 0);
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      chunks.push(value);
+      received += value.byteLength;
+      
+      const now = performance.now();
+      const lastPost = inFlight.get(urlStr)?.lastPostTs || 0;
+      if (now - lastPost > 200) {
+        sourceClient.postMessage({ status: 'downloading', url: urlStr, received, size });
+        inFlight.set(urlStr, { controller, lastPostTs: now });
+      }
+    }
+    
+    const blob = new Blob(chunks);
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
     const db = await openDB();
     
-    // Simple success response for now
-    await saveBlobToIDB(db, key, 'audio/mp4', new Blob(['test'], {type: 'audio/mp4'}));
+    await saveBlobToIDB(db, key, 'audio/mp4', blob);
     
     inFlight.delete(urlStr);
-    sourceClient.postMessage({ status: 'saved', url: urlStr, received: 1000, size: 1000 });
+    sourceClient.postMessage({ status: 'saved', url: urlStr, received: blob.size, size: blob.size });
     
   } catch (err) {
     inFlight.delete(urlStr);
-    sourceClient.postMessage({ status: 'error', url: urlStr, reason: err.message });
+    if (err.name === 'AbortError') {
+      sourceClient.postMessage({ status: 'removed', url: urlStr });
+    } else {
+      sourceClient.postMessage({ status: 'error', url: urlStr, reason: err.message });
+    }
   }
 }
 

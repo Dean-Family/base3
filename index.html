@@ -194,7 +194,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js?v=2.2.0')
+        navigator.serviceWorker.register('/sw.js?v=3.0.0')
           .then(reg => console.log('Service Worker registered:', reg.scope))
           .catch(err => console.log('Service Worker registration failed:', err));
       }
@@ -373,46 +373,8 @@
           }
 
           if (status === 'downloading') {
-            // Download with range requests
-            fetch(url, { method: 'HEAD' })
-              .then(response => {
-                const total = parseInt(response.headers.get('content-length'), 10);
-                const chunkSize = 512 * 1024; // 512KB chunks
-                const chunks = [];
-                let loaded = 0;
-                
-                async function downloadChunk(start, end) {
-                  const response = await fetch(url, {
-                    headers: { 'Range': `bytes=${start}-${end}` }
-                  });
-                  return response.arrayBuffer();
-                }
-                
-                async function downloadAll() {
-                  for (let start = 0; start < total; start += chunkSize) {
-                    const end = Math.min(start + chunkSize - 1, total - 1);
-                    const chunk = await downloadChunk(start, end);
-                    chunks.push(chunk);
-                    loaded += chunk.byteLength;
-                    
-                    const progress = Math.round((loaded / total) * 100);
-                    saveBtn.textContent = `Cancel ${progress}%`;
-                  }
-                  
-                  const blob = new Blob(chunks);
-                  navigator.serviceWorker.controller?.postMessage({ action: 'store', url, blob });
-                }
-                
-                return downloadAll();
-              })
-              .catch(err => {
-                saveBtn.textContent = 'Error';
-                saveBtn.disabled = false;
-                saveBtn.classList.remove('disabled');
-                saveBtn.dataset.state = '';
-              });
-            
-            saveBtn.textContent = 'Downloading...';
+            const pct = size ? Math.round((received / size) * 100) : 0;
+            saveBtn.textContent = `Cancel ${pct}%`;
             saveBtn.disabled = false;
             saveBtn.classList.remove('disabled');
             saveBtn.dataset.state = 'saving';
