@@ -212,34 +212,17 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     const contentLength = response.headers.get('Content-Length');
     const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
     
-    const reader = response.body.getReader();
-    const chunks = [];
-    let receivedBytes = 0;
+    // Use simple blob approach - avoid streaming issues
+    const blob = await response.blob();
+    const receivedBytes = blob.size;
     
-    // Read stream in chunks
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      chunks.push(value);
-      receivedBytes += value.byteLength;
-      
-      // Throttled progress updates
-      const now = performance.now();
-      const lastPost = inFlight.get(urlStr)?.lastPostTs || 0;
-      if (now - lastPost > 500) { // Update every 500ms
-        sourceClient.postMessage({ 
-          status: 'downloading', 
-          url: urlStr, 
-          received: receivedBytes, 
-          size: totalSize 
-        });
-        inFlight.set(urlStr, { controller, lastPostTs: now });
-      }
-    }
-    
-    // Create blob from chunks
-    const blob = new Blob(chunks);
+    // Update progress to show completion
+    sourceClient.postMessage({ 
+      status: 'downloading', 
+      url: urlStr, 
+      received: receivedBytes, 
+      size: totalSize || receivedBytes 
+    });
     
     // Store in IndexedDB
     const url = new URL(urlStr, self.location.origin);
