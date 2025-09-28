@@ -246,19 +246,41 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  console.log('Testing simple metadata save:', key, blob.size);
-  
-  // Just save metadata for now - test if idbPut works at all
-  await idbPut(db, 'tracks', {
-    trackKey: key,
-    urlPath: key,
-    mime,
-    size: blob.size,
-    downloadedAt: Date.now()
-    // No blob or chunks - just metadata
+  return new Promise((resolve, reject) => {
+    console.log('Direct IDB save:', key, blob.size);
+    
+    const tx = db.transaction('tracks', 'readwrite');
+    const store = tx.objectStore('tracks');
+    
+    const record = {
+      trackKey: key,
+      urlPath: key,
+      mime,
+      size: blob.size,
+      downloadedAt: Date.now()
+    };
+    
+    const request = store.put(record);
+    
+    request.onsuccess = () => {
+      console.log('Direct IDB save successful');
+      resolve();
+    };
+    
+    request.onerror = () => {
+      console.error('Direct IDB save failed:', request.error);
+      reject(request.error);
+    };
+    
+    tx.oncomplete = () => {
+      console.log('Transaction completed');
+    };
+    
+    tx.onerror = () => {
+      console.error('Transaction failed:', tx.error);
+      reject(tx.error);
+    };
   });
-  
-  console.log('Metadata saved successfully');
 }
 
 async function removeAudioFromIDB(urlStr) {
