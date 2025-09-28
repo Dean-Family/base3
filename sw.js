@@ -206,45 +206,15 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
   try {
     sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
     
-    // Try streaming first, fallback to simple blob if it stalls
-    let blob;
-    try {
-      const res = await fetch(urlStr, { signal: controller.signal });
-      if (!res.ok) throw new Error('Network error');
-      
-      // Set overall timeout for streaming
-      const streamTimeout = setTimeout(() => controller.abort(), 20000);
-      
-      const size = Number(res.headers.get('Content-Length') || 0);
-      const reader = res.body.getReader();
-      const chunks = [];
-      let received = 0;
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        chunks.push(value);
-        received += value.byteLength;
-        
-        const now = performance.now();
-        const lastPost = inFlight.get(urlStr)?.lastPostTs || 0;
-        if (now - lastPost > 200) {
-          sourceClient.postMessage({ status: 'downloading', url: urlStr, received, size });
-          inFlight.set(urlStr, { controller, lastPostTs: now });
-        }
-      }
-      
-      clearTimeout(streamTimeout);
-      blob = new Blob(chunks);
-      
-    } catch (streamErr) {
-      // Streaming failed, try simple blob download
-      sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
-      const res = await fetch(urlStr);
-      if (!res.ok) throw new Error('Network error');
-      blob = await res.blob();
-    }
+    // Update to show we're downloading
+    setTimeout(() => {
+      sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 50, size: 100 });
+    }, 1000);
+    
+    // Simple blob download - no streaming
+    const res = await fetch(urlStr, { signal: controller.signal });
+    if (!res.ok) throw new Error('Network error');
+    const blob = await res.blob();
     
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
