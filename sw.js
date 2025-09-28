@@ -206,35 +206,46 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
   try {
     sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
     
-    const res = await fetch(urlStr, { signal: controller.signal });
-    if (!res.ok) throw new Error('Network error');
-    
-    const size = Number(res.headers.get('Content-Length') || 0);
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
-    
-    while (true) {
-      const readPromise = reader.read();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Read timeout')), 5000)
-      );
+    // Try streaming first, fallback to simple blob if it stalls
+    let blob;
+    try {
+      const res = await fetch(urlStr, { signal: controller.signal });
+      if (!res.ok) throw new Error('Network error');
       
-      const { done, value } = await Promise.race([readPromise, timeoutPromise]);
-      if (done) break;
+      // Set overall timeout for streaming
+      const streamTimeout = setTimeout(() => controller.abort(), 20000);
       
-      chunks.push(value);
-      received += value.byteLength;
+      const size = Number(res.headers.get('Content-Length') || 0);
+      const reader = res.body.getReader();
+      const chunks = [];
+      let received = 0;
       
-      const now = performance.now();
-      const lastPost = inFlight.get(urlStr)?.lastPostTs || 0;
-      if (now - lastPost > 200) {
-        sourceClient.postMessage({ status: 'downloading', url: urlStr, received, size });
-        inFlight.set(urlStr, { controller, lastPostTs: now });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        chunks.push(value);
+        received += value.byteLength;
+        
+        const now = performance.now();
+        const lastPost = inFlight.get(urlStr)?.lastPostTs || 0;
+        if (now - lastPost > 200) {
+          sourceClient.postMessage({ status: 'downloading', url: urlStr, received, size });
+          inFlight.set(urlStr, { controller, lastPostTs: now });
+        }
       }
+      
+      clearTimeout(streamTimeout);
+      blob = new Blob(chunks);
+      
+    } catch (streamErr) {
+      // Streaming failed, try simple blob download
+      sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
+      const res = await fetch(urlStr);
+      if (!res.ok) throw new Error('Network error');
+      blob = await res.blob();
     }
     
-    const blob = new Blob(chunks);
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
     const db = await openDB();
