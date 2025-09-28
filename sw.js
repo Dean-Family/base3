@@ -227,9 +227,13 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     // Store in IndexedDB
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
+    
+    console.log('Opening DB for save...');
     const db = await openDB();
+    console.log('DB opened, saving blob:', blob.size, 'bytes');
     
     await saveBlobToIDB(db, key, 'audio/mp4', blob);
+    console.log('Blob saved to IDB successfully');
     
     inFlight.delete(urlStr);
     sourceClient.postMessage({ 
@@ -251,14 +255,18 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 
 async function saveBlobToIDB(db, key, mime, blob) {
   try {
-    await idbPut(db, 'tracks', {
+    console.log('Saving to IDB:', key, mime, blob.size);
+    const record = {
       trackKey: key,
       urlPath: key,
       mime,
       size: blob.size,
       blob,
       downloadedAt: Date.now()
-    });
+    };
+    console.log('Record created, calling idbPut...');
+    await idbPut(db, 'tracks', record);
+    console.log('idbPut completed successfully');
   } catch (e) {
     console.error('Failed to save to tracks store:', e);
     throw e;
