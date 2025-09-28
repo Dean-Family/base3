@@ -227,13 +227,19 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     // Skip actual IDB save for now - just test UI flow
     console.log('Skipping IDB save, marking as complete');
     
+    console.log('About to send saved message...');
     inFlight.delete(urlStr);
-    sourceClient.postMessage({ 
+    
+    const savedMessage = { 
       status: 'saved', 
       url: urlStr, 
       received: blob.size, 
       size: blob.size 
-    });
+    };
+    
+    console.log('Sending saved message:', savedMessage);
+    sourceClient.postMessage(savedMessage);
+    console.log('Saved message sent successfully');
     
   } catch (err) {
     inFlight.delete(urlStr);
