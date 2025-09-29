@@ -220,13 +220,14 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
     
-    console.log('Opening DB for save...');
-    const db = await openDB();
-    console.log('DB opened, saving blob:', blob.size, 'bytes');
+    console.log('Skipping DB open for testing');
+    // const db = await openDB();
+    console.log('Processing blob:', blob.size, 'bytes');
     
-    // Real IDB save
-    await saveBlobToIDB(db, key, 'audio/mp4', blob);
-    console.log('Real IDB save completed');
+    // Skip DB operations entirely
+    console.log('Skipping all DB operations');
+    // await saveBlobToIDB(db, key, 'audio/mp4', blob);
+    console.log('Fake save completed');
     
     console.log('About to send saved message...');
     inFlight.delete(urlStr);
