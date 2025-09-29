@@ -220,31 +220,14 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     const url = new URL(urlStr, self.location.origin);
     const key = url.pathname;
     
-    console.log('Opening DB with timeout...');
-    
-    try {
-      const db = await Promise.race([
-        openDB(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), 5000))
-      ]);
-      console.log('DB opened successfully');
-      
-      // Simple metadata save only
-      localStorage.setItem(`offline_${key}`, JSON.stringify({
-        size: blob.size,
-        mime: 'audio/mp4',
-        saved: Date.now()
-      }));
-      console.log('Metadata saved to localStorage');
-      
-    } catch (err) {
-      console.log('DB failed, using localStorage fallback:', err.message);
-      localStorage.setItem(`offline_${key}`, JSON.stringify({
-        size: blob.size,
-        mime: 'audio/mp4', 
-        saved: Date.now()
-      }));
-    }
+    // Simple localStorage approach for now
+    console.log('Saving metadata to localStorage');
+    localStorage.setItem(`offline_${key}`, JSON.stringify({
+      size: blob.size,
+      mime: 'audio/mp4',
+      saved: Date.now()
+    }));
+    console.log('Metadata saved successfully');
     
     console.log('About to send saved message...');
     inFlight.delete(urlStr);
@@ -261,6 +244,7 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
     console.log('Saved message sent successfully');
     
   } catch (err) {
+    console.error('Save failed with error:', err);
     inFlight.delete(urlStr);
     if (err.name === 'AbortError') {
       sourceClient.postMessage({ status: 'removed', url: urlStr });
