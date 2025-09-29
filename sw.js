@@ -253,42 +253,26 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  return new Promise((resolve, reject) => {
-    console.log('Real IDB save starting:', key, blob.size);
-    
-    const tx = db.transaction('tracks', 'readwrite');
-    const store = tx.objectStore('tracks');
-    
-    const record = {
-      trackKey: key,
-      urlPath: key,
-      mime,
-      size: blob.size,
-      blob: blob, // Store the actual blob
-      downloadedAt: Date.now()
-    };
-    
-    console.log('Putting record in IDB...');
-    const request = store.put(record);
-    
-    request.onsuccess = () => {
-      console.log('IDB put request succeeded');
-    };
-    
-    request.onerror = () => {
-      console.error('IDB put request failed:', request.error);
-      reject(request.error);
-    };
-    
-    tx.oncomplete = () => {
-      console.log('IDB transaction completed successfully');
+  console.log('Using localStorage instead of IDB for testing:', key, blob.size);
+  
+  // Convert blob to base64 for localStorage
+  const reader = new FileReader();
+  return new Promise((resolve) => {
+    reader.onload = () => {
+      const base64 = reader.result;
+      const record = {
+        trackKey: key,
+        mime,
+        size: blob.size,
+        data: base64,
+        downloadedAt: Date.now()
+      };
+      
+      localStorage.setItem(`track_${key}`, JSON.stringify(record));
+      console.log('Saved to localStorage successfully');
       resolve();
     };
-    
-    tx.onerror = () => {
-      console.error('IDB transaction failed:', tx.error);
-      reject(tx.error);
-    };
+    reader.readAsDataURL(blob);
   });
 }
 
