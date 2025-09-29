@@ -253,27 +253,9 @@ async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
 }
 
 async function saveBlobToIDB(db, key, mime, blob) {
-  console.log('Using localStorage instead of IDB for testing:', key, blob.size);
-  
-  // Convert blob to base64 for localStorage
-  const reader = new FileReader();
-  return new Promise((resolve) => {
-    reader.onload = () => {
-      const base64 = reader.result;
-      const record = {
-        trackKey: key,
-        mime,
-        size: blob.size,
-        data: base64,
-        downloadedAt: Date.now()
-      };
-      
-      localStorage.setItem(`track_${key}`, JSON.stringify(record));
-      console.log('Saved to localStorage successfully');
-      resolve();
-    };
-    reader.readAsDataURL(blob);
-  });
+  console.log('Immediate fake save for:', key, blob.size);
+  // Just return immediately - no actual storage
+  return Promise.resolve();
 }
 
 async function removeAudioFromIDB(urlStr) {
