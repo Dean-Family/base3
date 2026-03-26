@@ -1,15 +1,18 @@
-// sw.js - Service Worker using IndexedDB for audio storage
+// sw.js - Service Worker for robust offline audio playback via IndexedDB
 
-const CACHE_NAME = 'base3-shell-v22';
+const CACHE_NAME = 'base3-shell-v23';
 const SHELL_ASSETS = [
-  // Only cache assets that don't cause 206 responses
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/player-state.js',
   '/images/Base3Logo.jpg'
 ];
 
 // IndexedDB setup ----------------------------------------------------------
 const DB_NAME = 'base3';
-const DB_VERSION = 3;
-const inFlight = new Map(); // url -> {controller, lastPostTs}
+const DB_VERSION = 4;
+const inFlight = new Map(); // trackKey -> AbortController
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -39,240 +42,323 @@ function openDB() {
   });
 }
 
-function idbPut(db, store, value) {
+function withStore(db, storeName, mode, work) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.oncomplete = () => resolve();
+    const tx = db.transaction(storeName, mode);
+    const store = tx.objectStore(storeName);
+    const result = work(store, tx);
+
+    tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error);
-    tx.objectStore(store).put(value);
+    tx.onabort = () => reject(tx.error || new Error(`Transaction aborted for ${storeName}`));
   });
 }
 
-function idbGet(db, store, key) {
+async function idbPut(db, storeName, value) {
+  return withStore(db, storeName, 'readwrite', store => {
+    store.put(value);
+  });
+}
+
+async function idbGet(db, storeName, key) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).get(key);
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).get(key);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-function idbDelete(db, store, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.objectStore(store).delete(key);
+async function idbDelete(db, storeName, key) {
+  return withStore(db, storeName, 'readwrite', store => {
+    store.delete(key);
   });
+}
+
+async function idbDeleteChunks(db, trackKey) {
+  return withStore(db, 'chunks', 'readwrite', store => {
+    const range = IDBKeyRange.bound([trackKey, 0], [trackKey, Number.MAX_SAFE_INTEGER]);
+    store.openCursor(range).onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (!cursor) return;
+      cursor.delete();
+      cursor.continue();
+    };
+  });
+}
+
+function normalizeTrackKey(urlLike) {
+  const absolute = new URL(urlLike, self.location.origin);
+  return absolute.pathname;
+}
+
+function mimeFromPath(pathname) {
+  if (pathname.endsWith('.wav')) return 'audio/wav';
+  if (pathname.endsWith('.m4a')) return 'audio/mp4';
+  return 'application/octet-stream';
 }
 
 // Caching the application shell -------------------------------------------
 self.addEventListener('install', event => {
   self.skipWaiting();
-  // Skip shell caching for now - focus on audio caching
-  console.log('Service worker installed, skipping shell cache');
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(SHELL_ASSETS);
+  })());
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(names =>
-      Promise.all(names.map(name => (name === CACHE_NAME ? null : caches.delete(name))))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.map(name => (name === CACHE_NAME ? null : caches.delete(name))));
+    await self.clients.claim();
+  })());
 });
 
 // Helpers -----------------------------------------------------------------
 function parseRange(rangeHeader, size) {
-  // Supports: "bytes=START-END", "bytes=START-", "bytes=-SUFFIX"
   const m = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader || '');
   if (!m) return null;
 
   let start = m[1] === '' ? undefined : Number(m[1]);
-  let end   = m[2] === '' ? undefined : Number(m[2]);
+  let end = m[2] === '' ? undefined : Number(m[2]);
   if (start === undefined && end === undefined) return null;
-  if (start !== undefined && (isNaN(start) || start < 0)) return null;
-  if (end   !== undefined && (isNaN(end)   || end   < 0)) return null;
+  if (start !== undefined && (!Number.isFinite(start) || start < 0)) return null;
+  if (end !== undefined && (!Number.isFinite(end) || end < 0)) return null;
 
   if (start === undefined) {
-    // "-SUFFIX" → last N bytes
     const length = Math.min(end, size);
     start = Math.max(0, size - length);
     end = size - 1;
-  } else {
-    if (end === undefined || end >= size) end = size - 1;
+  } else if (end === undefined || end >= size) {
+    end = size - 1;
   }
 
   if (start >= size || start > end) return null;
   return { start, end };
 }
 
-async function serveFromIDB(request) {
-  const url = new URL(request.url);
-  const trackKey = url.pathname;
-  const db = await openDB();
-  const record = await idbGet(db, 'tracks', trackKey);
-
-  if (!record || !record.blob) {
-    // No offline copy → network
-    return fetch(request);
-  }
-
-  const blob = record.blob;
-  const mime = record.mime || 'application/octet-stream';
-  const size = blob.size;
-
-  if (request.headers.has('range')) {
-    const parsed = parseRange(request.headers.get('range'), size);
-    if (!parsed) {
-      return new Response(null, {
-        status: 416,
-        headers: { 'Content-Range': `bytes */${size}` }
-      });
-    }
-    const { start, end } = parsed;
-    const slice = blob.slice(start, end + 1);
-    return new Response(slice, {
-      status: 206,
+function makeAudioResponse(blob, mime, size, rangeHeader) {
+  if (!rangeHeader) {
+    return new Response(blob, {
       headers: {
         'Content-Type': mime,
         'Accept-Ranges': 'bytes',
-        'Content-Range': `bytes ${start}-${end}/${size}`,
-        'Content-Length': String(end - start + 1)
+        'Content-Length': String(size)
       }
     });
   }
 
-  // Full response
-  return new Response(blob, {
+  const parsed = parseRange(rangeHeader, size);
+  if (!parsed) {
+    return new Response(null, {
+      status: 416,
+      headers: { 'Content-Range': `bytes */${size}` }
+    });
+  }
+
+  const { start, end } = parsed;
+  const slice = blob.slice(start, end + 1);
+  return new Response(slice, {
+    status: 206,
     headers: {
       'Content-Type': mime,
       'Accept-Ranges': 'bytes',
-      'Content-Length': String(size)
+      'Content-Range': `bytes ${start}-${end}/${size}`,
+      'Content-Length': String(end - start + 1)
     }
   });
 }
 
+async function serveFromIDBOrNetwork(request) {
+  const trackKey = normalizeTrackKey(request.url);
+
+  try {
+    const db = await openDB();
+    const record = await idbGet(db, 'tracks', trackKey);
+    if (record?.blob instanceof Blob) {
+      const mime = record.mime || record.blob.type || mimeFromPath(trackKey);
+      const size = Number.isFinite(record.size) ? record.size : record.blob.size;
+      return makeAudioResponse(record.blob, mime, size, request.headers.get('range'));
+    }
+  } catch (error) {
+    console.error('Failed reading from IDB, falling back to network:', error);
+  }
+
+  return fetch(request);
+}
+
 // Fetch handling -----------------------------------------------------------
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
   if (req.destination === 'audio' || url.pathname.startsWith('/music/')) {
-    event.respondWith(serveFromIDB(req));
+    event.respondWith(serveFromIDBOrNetwork(req));
     return;
   }
 
-  event.respondWith(caches.match(req).then(r => r || fetch(req)));
+  event.respondWith((async () => {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+
+    const response = await fetch(req);
+    if (req.method === 'GET' && response.ok && url.origin === self.location.origin) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(req, response.clone());
+    }
+    return response;
+  })());
 });
 
 // Messaging ---------------------------------------------------------------
-self.addEventListener('message', (event) => {
+self.addEventListener('message', event => {
   const { action, url } = event.data || {};
-  if (!action || !url) return;
+  const sourceClient = event.source;
+  if (!sourceClient || typeof action !== 'string' || typeof url !== 'string') return;
 
   if (action === 'test') {
-    event.source.postMessage({ status: 'test-ok', url });
-  } else if (action === 'check') {
-    hasAudioInIDB(url).then((hit) => {
-      event.source.postMessage({ status: hit ? 'saved' : 'removed', url });
-    }).catch(() => {
-      event.source.postMessage({ status: 'removed', url });
-    });
-  } else if (action === 'save') {
-    saveAudioToIDBWithProgress(url, event.source);
-  } else if (action === 'remove') {
-    removeAudioFromIDB(url).then(() => {
-      event.source.postMessage({ status: 'removed', url });
-    });
-  } else if (action === 'abort') {
-    const rec = inFlight.get(url);
-    if (rec) rec.controller.abort();
-    event.source.postMessage({ status: 'removed', url });
+    sourceClient.postMessage({ status: 'test-ok', url: normalizeTrackKey(url) });
+    return;
+  }
+
+  const trackKey = normalizeTrackKey(url);
+
+  if (action === 'check') {
+    hasAudioInIDB(trackKey)
+      .then(record => {
+        sourceClient.postMessage({
+          status: record ? 'saved' : 'removed',
+          url: trackKey,
+          size: record?.size || 0
+        });
+      })
+      .catch(() => {
+        sourceClient.postMessage({ status: 'removed', url: trackKey, size: 0 });
+      });
+    return;
+  }
+
+  if (action === 'save') {
+    saveAudioToIDBWithProgress(trackKey, sourceClient);
+    return;
+  }
+
+  if (action === 'remove') {
+    removeAudioFromIDB(trackKey)
+      .then(() => sourceClient.postMessage({ status: 'removed', url: trackKey, size: 0 }))
+      .catch(err => sourceClient.postMessage({ status: 'error', url: trackKey, reason: err.message }));
+    return;
+  }
+
+  if (action === 'abort') {
+    const controller = inFlight.get(trackKey);
+    if (controller) controller.abort();
+    sourceClient.postMessage({ status: 'removed', url: trackKey, size: 0 });
   }
 });
 
-async function saveAudioToIDBWithProgress(urlStr, sourceClient) {
+async function saveAudioToIDBWithProgress(trackKey, sourceClient) {
+  const active = inFlight.get(trackKey);
+  if (active) {
+    active.abort();
+    inFlight.delete(trackKey);
+  }
+
   const controller = new AbortController();
-  inFlight.set(urlStr, { controller, lastPostTs: 0 });
-  
+  inFlight.set(trackKey, controller);
+
   try {
-    sourceClient.postMessage({ status: 'downloading', url: urlStr, received: 0, size: 0 });
-    
-    const response = await fetch(urlStr, { signal: controller.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    
-    const contentLength = response.headers.get('Content-Length');
-    const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
-    
-    // Use simple blob approach - avoid streaming issues
-    const blob = await response.blob();
-    const receivedBytes = blob.size;
-    
-    // Update progress to show completion
-    sourceClient.postMessage({ 
-      status: 'downloading', 
-      url: urlStr, 
-      received: receivedBytes, 
-      size: totalSize || receivedBytes 
+    sourceClient.postMessage({ status: 'downloading', url: trackKey, received: 0, size: 0 });
+
+    const response = await fetch(trackKey, {
+      signal: controller.signal,
+      cache: 'no-store'
     });
-    
-    // Store in IndexedDB
-    const url = new URL(urlStr, self.location.origin);
-    const key = url.pathname;
-    
-    // Simple localStorage approach for now
-    console.log('Saving metadata to localStorage');
-    localStorage.setItem(`offline_${key}`, JSON.stringify({
-      size: blob.size,
-      mime: 'audio/mp4',
-      saved: Date.now()
-    }));
-    console.log('Metadata saved successfully');
-    
-    console.log('About to send saved message...');
-    inFlight.delete(urlStr);
-    
-    const savedMessage = { 
-      status: 'saved', 
-      url: urlStr, 
-      received: blob.size, 
-      size: blob.size 
-    };
-    
-    console.log('Sending saved message:', savedMessage);
-    sourceClient.postMessage(savedMessage);
-    console.log('Saved message sent successfully');
-    
-  } catch (err) {
-    console.error('Save failed with error:', err);
-    inFlight.delete(urlStr);
-    if (err.name === 'AbortError') {
-      sourceClient.postMessage({ status: 'removed', url: urlStr });
-    } else {
-      sourceClient.postMessage({ status: 'error', url: urlStr, reason: err.message });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const mime = response.headers.get('Content-Type') || mimeFromPath(trackKey);
+    const totalSize = Number.parseInt(response.headers.get('Content-Length') || '0', 10) || 0;
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('ReadableStream not available in this browser');
+
+    const chunks = [];
+    let receivedBytes = 0;
+    let lastUpdateTs = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      if (!(value instanceof Uint8Array)) continue;
+      chunks.push(value);
+      receivedBytes += value.byteLength;
+
+      const now = Date.now();
+      if (now - lastUpdateTs > 150 || (totalSize && receivedBytes >= totalSize)) {
+        lastUpdateTs = now;
+        sourceClient.postMessage({
+          status: 'downloading',
+          url: trackKey,
+          received: receivedBytes,
+          size: totalSize || receivedBytes
+        });
+      }
     }
+
+    const blob = new Blob(chunks, { type: mime });
+    const finalSize = blob.size;
+
+    const db = await openDB();
+    await idbPut(db, 'tracks', {
+      trackKey,
+      blob,
+      mime,
+      size: finalSize,
+      updatedAt: Date.now()
+    });
+
+    await idbPut(db, 'downloads', {
+      trackKey,
+      status: 'saved',
+      size: finalSize,
+      updatedAt: Date.now()
+    });
+
+    sourceClient.postMessage({
+      status: 'saved',
+      url: trackKey,
+      received: finalSize,
+      size: finalSize
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      sourceClient.postMessage({ status: 'removed', url: trackKey, size: 0 });
+    } else {
+      console.error('Save failed:', err);
+      sourceClient.postMessage({ status: 'error', url: trackKey, reason: err?.message || 'unknown' });
+    }
+  } finally {
+    inFlight.delete(trackKey);
   }
 }
 
-async function saveBlobToIDB(db, key, mime, blob) {
-  console.log('Immediate fake save for:', key, blob.size);
-  // Just return immediately - no actual storage
-  return Promise.resolve();
-}
-
-async function removeAudioFromIDB(urlStr) {
-  const url = new URL(urlStr, self.location.origin);
-  const key = url.pathname;
+async function removeAudioFromIDB(trackKey) {
   const db = await openDB();
-  await idbDelete(db, 'tracks', key);
-  await idbDelete(db, 'downloads', key);
+  await Promise.all([
+    idbDelete(db, 'tracks', trackKey),
+    idbDelete(db, 'downloads', trackKey),
+    idbDeleteChunks(db, trackKey)
+  ]);
 }
 
-async function hasAudioInIDB(urlStr) {
-  const url = new URL(urlStr, self.location.origin);
-  const key = url.pathname;
+async function hasAudioInIDB(trackKey) {
   const db = await openDB();
-  const rec = await idbGet(db, 'tracks', key);
-  return rec && rec.blob ? rec : null;
+  const record = await idbGet(db, 'tracks', trackKey);
+  if (record?.blob instanceof Blob && Number.isFinite(record.size)) return record;
+  if (record?.blob instanceof Blob) {
+    return { ...record, size: record.blob.size };
+  }
+  return null;
 }
-

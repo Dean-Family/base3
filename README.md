@@ -3,9 +3,10 @@
 A static web application for listening to the album **Base 3** online.
 
 ## Usage
-Open `index.html` in a modern browser to play tracks. A service worker caches audio
-files for offline playback. The app also includes a web app manifest and theme color
-so it can be installed like a Progressive Web App.
+Open `index.html` in a modern browser to play tracks. A service worker stores audio
+files in IndexedDB for offline playback and also caches the app shell so the player
+loads while offline. The app includes a web app manifest and theme color so it can be
+installed like a Progressive Web App.
 
 ## Debugging offline support
 The player now exposes a **Debug Tools** section in the UI that shows your current
