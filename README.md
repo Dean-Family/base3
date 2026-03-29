@@ -14,6 +14,21 @@ online status and lists everything stored in the service worker cache. You can
 refresh the list or clear all caches directly from the page to help troubleshoot
 offline behaviour.
 
+## Offline regression checklist
+Use this quick smoke test after service worker or playback changes:
+
+1. Open the site while online and wait for the service worker to activate.
+2. Save at least one track with **Save for offline**.
+3. Disable network (DevTools → Offline) and refresh.
+4. Confirm the app shell still loads from cache.
+5. Play the saved track and seek within it.
+6. Reload once more while still offline and verify playback state resumes.
+
+The service worker also includes a navigation fallback that first tries a cached
+navigation match with query strings ignored, then falls back to `/index.html` (or
+`/`). This keeps direct offline reloads working even when the requested URL shape
+does not exactly match a cached key.
+
 ## License
 This project is made available under **your choice** of the following licenses:
 

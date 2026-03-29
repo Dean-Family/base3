@@ -202,12 +202,30 @@ self.addEventListener('fetch', event => {
     const cached = await caches.match(req);
     if (cached) return cached;
 
-    const response = await fetch(req);
-    if (req.method === 'GET' && response.ok && url.origin === self.location.origin) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(req, response.clone());
+    // Navigations often include query params that should still map to shell.
+    if (req.mode === 'navigate') {
+      const cachedNav = await caches.match(req, { ignoreSearch: true });
+      if (cachedNav) return cachedNav;
     }
-    return response;
+
+    try {
+      const response = await fetch(req);
+      if (req.method === 'GET' && response.ok && url.origin === self.location.origin) {
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(req, response.clone());
+      }
+      return response;
+    } catch (error) {
+      // Keep SPA navigation resilient when users launch while offline.
+      if (req.mode === 'navigate') {
+        const fallback =
+          (await caches.match(req, { ignoreSearch: true })) ||
+          (await caches.match('/index.html')) ||
+          (await caches.match('/'));
+        if (fallback) return fallback;
+      }
+      throw error;
+    }
   })());
 });
 
