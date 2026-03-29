@@ -1,8 +1,8 @@
-import { test, expect, devices } from '@playwright/test';
+import { test, expect, devices, type Page } from '@playwright/test';
 
-const FIRST_TRACK_PATH = '/music/Lead_with_Your_Hips.m4a';
+const TEST_TRACK_PATH = '/music/e2e-test-track.m4a';
 
-async function awaitServiceWorkerReady(page: Parameters<typeof test>[0]['page']) {
+async function awaitServiceWorkerReady(page: Page) {
   await page.goto('/');
   await page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
@@ -11,31 +11,54 @@ async function awaitServiceWorkerReady(page: Parameters<typeof test>[0]['page'])
     await navigator.serviceWorker.ready;
   });
 
-  await expect.poll(async () => {
-    return page.evaluate(() => Boolean(navigator.serviceWorker.controller));
-  }).toBeTruthy();
+  await expect
+    .poll(async () => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+    .toBeTruthy();
+}
+
+async function configureFirstTrackForMockedDownload(page: Page, trackPath = TEST_TRACK_PATH) {
+  await page.evaluate((path) => {
+    const firstTrack = document.querySelector('.track');
+    const audio = firstTrack?.querySelector('audio');
+    if (!(audio instanceof HTMLAudioElement)) {
+      throw new Error('First track audio element not found');
+    }
+
+    audio.src = path;
+    audio.load();
+  }, trackPath);
+}
+
+async function mockAudioResponse(page: Page, trackPath = TEST_TRACK_PATH, byteSize = 512 * 1024) {
+  await page.route(trackPath, async route => {
+    const payload = Buffer.alloc(byteSize, 7);
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'audio/mp4',
+        'Content-Length': String(payload.byteLength),
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: payload
+    });
+  });
+}
+
+async function clickSaveAndWaitForSettledState(page: Page, expectedText: string) {
+  const button = page.locator('.track').first().locator('.save-offline');
+  await button.click();
+  await expect(button).not.toHaveText(/Cancel/, { timeout: 60_000 });
+  await expect(button).toHaveText(expectedText, { timeout: 15_000 });
+  return button;
 }
 
 test.describe('offline playback safety net', () => {
   test('waits for service worker activation before saving offline and validates IDB blob size', async ({ page }) => {
-    await page.route(FIRST_TRACK_PATH, async route => {
-      const payload = Buffer.alloc(1024 * 512, 4); // 512KB deterministic payload.
-      await route.fulfill({
-        status: 200,
-        headers: {
-          'Content-Type': 'audio/mp4',
-          'Content-Length': String(payload.byteLength),
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: payload
-      });
-    });
-
     await awaitServiceWorkerReady(page);
+    await mockAudioResponse(page);
+    await configureFirstTrackForMockedDownload(page);
 
-    const firstSaveButton = page.locator('.track').first().locator('.save-offline');
-    await firstSaveButton.click();
-    await expect(firstSaveButton).toHaveText('Saved', { timeout: 45_000 });
+    await clickSaveAndWaitForSettledState(page, 'Saved');
 
     const storedRecord = await page.evaluate(async (trackPath) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -56,7 +79,7 @@ test.describe('offline playback safety net', () => {
         size: record?.size ?? record?.blob?.size ?? 0,
         type: record?.blob?.type ?? null
       };
-    }, FIRST_TRACK_PATH);
+    }, TEST_TRACK_PATH);
 
     expect(storedRecord.size).toBeGreaterThan(200_000);
     expect(storedRecord.size).toBeLessThan(2_000_000);
@@ -76,11 +99,9 @@ test.describe('offline playback safety net', () => {
             const tx = originalTransaction(...txArgs);
             if (txArgs[0] === 'tracks' || (Array.isArray(txArgs[0]) && txArgs[0].includes('tracks'))) {
               const store = tx.objectStore('tracks');
-              const originalPut = store.put.bind(store);
-              store.put = function (...putArgs: Parameters<IDBObjectStore['put']>) {
+              store.put = function () {
                 throw new DOMException('Simulated quota failure', 'QuotaExceededError');
-              };
-              void originalPut;
+              } as IDBObjectStore['put'];
             }
             return tx;
           };
@@ -88,64 +109,61 @@ test.describe('offline playback safety net', () => {
         return req;
       };
 
-      const storageShim = {
-        estimate: async () => ({ usage: 49_000_000, quota: 50_000_000 }),
-        persist: navigator.storage.persist.bind(navigator.storage)
-      } as StorageManager;
-
       Object.defineProperty(navigator, 'storage', {
         configurable: true,
-        value: storageShim
+        value: {
+          estimate: async () => ({ usage: 49_000_000, quota: 50_000_000 }),
+          persist: navigator.storage.persist.bind(navigator.storage)
+        } satisfies StorageManager
       });
     });
 
     await awaitServiceWorkerReady(page);
-    const firstSaveButton = page.locator('.track').first().locator('.save-offline');
-    await firstSaveButton.click();
+    await mockAudioResponse(page);
+    await configureFirstTrackForMockedDownload(page);
 
-    await expect(firstSaveButton).toHaveText('Error', { timeout: 45_000 });
+    const firstSaveButton = await clickSaveAndWaitForSettledState(page, 'Error');
     await expect(firstSaveButton).toBeEnabled();
   });
 
   test('requests persistent storage only after user gesture', async ({ page }) => {
     await page.addInitScript(() => {
       let persistCallCount = 0;
-      const storageShim = {
-        estimate: navigator.storage.estimate.bind(navigator.storage),
-        persist: async () => {
-          persistCallCount += 1;
-          return true;
-        }
-      } as StorageManager;
 
       Object.defineProperty(navigator, 'storage', {
         configurable: true,
-        value: storageShim
+        value: {
+          estimate: navigator.storage.estimate.bind(navigator.storage),
+          persist: async () => {
+            persistCallCount += 1;
+            return true;
+          }
+        } satisfies StorageManager
       });
 
       (window as unknown as { __persistCallCount: () => number }).__persistCallCount = () => persistCallCount;
     });
 
     await awaitServiceWorkerReady(page);
+    await mockAudioResponse(page);
+    await configureFirstTrackForMockedDownload(page);
 
     const beforeClick = await page.evaluate(() => (window as unknown as { __persistCallCount: () => number }).__persistCallCount());
     expect(beforeClick).toBe(0);
 
-    await page.locator('.track').first().locator('.save-offline').click();
+    await clickSaveAndWaitForSettledState(page, 'Saved');
 
     await expect
-      .poll(async () => {
-        return page.evaluate(() => (window as unknown as { __persistCallCount: () => number }).__persistCallCount());
-      })
+      .poll(async () => page.evaluate(() => (window as unknown as { __persistCallCount: () => number }).__persistCallCount()))
       .toBe(1);
   });
 
   test('handles bad network conditions by serving saved audio from IndexedDB cache', async ({ page }) => {
     await awaitServiceWorkerReady(page);
+    await mockAudioResponse(page);
+    await configureFirstTrackForMockedDownload(page);
 
-    const firstSaveButton = page.locator('.track').first().locator('.save-offline');
-    await firstSaveButton.click();
-    await expect(firstSaveButton).toHaveText('Saved', { timeout: 60_000 });
+    await clickSaveAndWaitForSettledState(page, 'Saved');
 
     await page.route('**/music/**', async route => {
       await new Promise(resolve => setTimeout(resolve, 7_000));
