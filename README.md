@@ -29,6 +29,12 @@ navigation match with query strings ignored, then falls back to `/index.html` (o
 `/`). This keeps direct offline reloads working even when the requested URL shape
 does not exactly match a cached key.
 
+## Automated Testing
+This project includes a robust Playwright test suite for verifying offline
+persistence, Service Worker lifecycle, and UI synchronization.
+
+See [TESTING.md](./TESTING.md) for architecture details and core mandates.
+
 ## License
 This project is made available under **your choice** of the following licenses:
 
