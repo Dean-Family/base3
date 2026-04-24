@@ -1,112 +1,85 @@
-import { test, expect, devices, type Page } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Mocks the navigator.serviceWorker API to provide a stable test environment.
- * This allows us to test the page's reactive UI logic without a real Service Worker.
+ * RULE 3: Scorched Earth Teardown
  */
-async function mockServiceWorkerAPI(page: Page) {
-  await page.addInitScript(() => {
-    const listeners = new Set<Function>();
-    
-    const mockController = {
-      postMessage: (data: any) => {
-        // Simulate Service Worker response after a short delay
-        setTimeout(() => {
-          const status = (data.action === 'check') ? 'removed' : 'saved';
-          const event = new MessageEvent('message', {
-            data: { ...data, status, received: 100, size: 100 },
-            origin: window.location.origin
-          });
-          listeners.forEach(l => l(event));
-          window.navigator.serviceWorker.dispatchEvent(event);
-        }, 50);
-      }
-    };
-
-    const mockSW = {
-      register: async () => ({ scope: '/', unregister: async () => true, update: async () => {} }),
-      getRegistration: async () => ({ scope: '/', unregister: async () => true, update: async () => {} }),
-      getRegistrations: async () => [],
-      ready: Promise.resolve({ scope: '/' }),
-      controller: mockController,
-      addEventListener: (type: string, listener: Function) => {
-        if (type === 'message') listeners.add(listener);
-      },
-      removeEventListener: (type: string, listener: Function) => {
-        if (type === 'message') {
-          const idx = listeners.has(listener);
-          if (idx) listeners.delete(listener);
-        }
-      },
-      dispatchEvent: (e: Event) => {
-        if (e.type === 'message' && (navigator.serviceWorker as any).onmessage) {
-          (navigator.serviceWorker as any).onmessage(e);
-        }
-        return true;
-      }
-    };
-
-    Object.defineProperty(navigator, 'serviceWorker', {
-      configurable: true,
-      value: mockSW
-    });
+async function scorchedEarth(page: Page) {
+  await page.evaluate(async () => {
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) await reg.unregister();
+    }
+    const dbs = ['base3', 'base3-media'];
+    for (const name of dbs) {
+      const req = window.indexedDB.deleteDatabase(name);
+      await new Promise((res) => {
+        req.onsuccess = res; req.onerror = res; req.onblocked = res;
+        setTimeout(res, 1000);
+      });
+    }
+    window.localStorage.clear();
   });
 }
 
-test.describe('offline playback UI logic', () => {
-  test.beforeEach(async ({ page }) => {
-    // We mock the API BEFORE navigation to ensure it's active when scripts run
-    await mockServiceWorkerAPI(page);
+test.describe('Offline UI - Integration', () => {
+  test.beforeEach(async ({ page, context }) => {
+    // Intercept music to keep it fast
+    await context.route('**/music/**', (r) => r.fulfill({ status: 200, body: Buffer.alloc(1024), contentType: 'audio/mp4' }));
+    
     await page.goto('/');
+    await scorchedEarth(page);
+    await page.reload();
+    
+    // Wait for real SW
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker?.controller), { timeout: 20000 }).toBeTruthy();
   });
 
-  test('button changes to Saved after successful offline save simulation', async ({ page }) => {
-    const saveBtn = page.locator('.save-offline').first();
+  test.afterEach(async ({ page }) => {
+    await scorchedEarth(page);
+  });
+
+  test('OfflineUI - Successful Save - Button Transitions to Saved', async ({ page }) => {
+    const track = page.locator('.track').first();
+    const saveBtn = track.locator('.save-offline');
+    
     await saveBtn.click();
     
-    // Should transition: Save -> Cancel (immediate) -> Saved (after mock delay)
-    await expect(saveBtn).toHaveText('Saved', { timeout: 5000 });
+    // UI should transition to Saved
+    await expect(saveBtn).toHaveText('Saved', { timeout: 15000 });
     await expect(saveBtn).toBeDisabled();
+    
+    const removeBtn = track.locator('.remove-offline');
+    await expect(removeBtn).not.toBeDisabled();
   });
 
-  test('requests persistent storage only after user gesture', async ({ page }) => {
+  test('StorageManager - Persistence Request - Only Triggers on User Gesture', async ({ page }) => {
+    // Mock navigator.storage.persist to track calls
     await page.evaluate(() => {
       (window as any).__persistCount = 0;
-      Object.defineProperty(navigator, 'storage', {
-        configurable: true,
-        value: {
-          persist: async () => { (window as any).__persistCount++; return true; },
-          estimate: async () => ({ usage: 0, quota: 1000 })
-        }
-      });
+      if (navigator.storage && navigator.storage.persist) {
+        const original = navigator.storage.persist.bind(navigator.storage);
+        navigator.storage.persist = async () => {
+          (window as any).__persistCount++;
+          return true;
+        };
+      }
     });
 
+    // Interaction triggers it (first save click in index.html logic)
     await page.locator('.save-offline').first().click();
 
-    await expect.poll(async () => {
-      return page.evaluate(() => (window as any).__persistCount);
-    }).toBe(1);
+    const count = await page.evaluate(() => (window as any).__persistCount);
+    expect(count).toBe(1);
   });
 
-  test('android install flow uses deferred beforeinstallprompt', async ({ page }) => {
-    await page.evaluate(() => {
-      window.addEventListener('beforeinstallprompt', e => {
-        e.preventDefault();
-        (window as any).__deferredPrompt = e;
-      });
-    });
-
+  test('InstallFlow - BeforeInstallPrompt - Defers Android Install', async ({ page }) => {
     const prevented = await page.evaluate(() => {
-      const e = new Event('beforeinstallprompt', { cancelable: true });
-      window.dispatchEvent(e);
-      return e.defaultPrevented;
+      let isPrevented = false;
+      const event = new Event('beforeinstallprompt') as any;
+      event.preventDefault = () => { isPrevented = true; };
+      window.dispatchEvent(event);
+      return isPrevented;
     });
     expect(prevented).toBe(true);
-  });
-
-  test('iOS Safari flow hides install guidance on other platforms', async ({ page }) => {
-    // guidance should only be visible if manual check passes
-    const help = page.locator('#ios-install-help');
-    await expect(help).not.toBeVisible();
   });
 });

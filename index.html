@@ -230,26 +230,41 @@
       tracks.forEach(t => wireAudio(t, toKey));
       tracks.forEach(t => resumeIfPossible(t));
 
-      const dbReq = indexedDB.open('base3');
+      const dbReq = indexedDB.open('base3', 5);
       dbReq.onsuccess = () => {
-        dbInfo.textContent = `DB: v${dbReq.result.version}`;
-        dbReq.result.close();
+        const db = dbReq.result;
+        dbInfo.textContent = `DB: v${db.version}`;
+        db.onversionchange = () => db.close();
+        db.close();
       };
 
       const swReady = 'serviceWorker' in navigator
         ? new Promise(resolve => {
             if (navigator.serviceWorker.controller) {
+              console.log('SW: Controller already present');
               resolve();
             } else {
-              navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
+              console.log('SW: Waiting for controller...');
+              navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('SW: Controller changed/acquired');
+                resolve();
+              }, { once: true });
             }
           })
         : Promise.resolve();
 
       function sendToServiceWorker(action, url) {
-        if (!('serviceWorker' in navigator)) return;
+        if (!('serviceWorker' in navigator)) {
+          console.warn('SW: Not supported in this browser');
+          return;
+        }
         swReady.then(() => {
-          navigator.serviceWorker.controller?.postMessage({ action, url });
+          console.log(`SW: Sending ${action} for ${url}`);
+          if (!navigator.serviceWorker.controller) {
+            console.error('SW: No controller available to receive message!');
+            return;
+          }
+          navigator.serviceWorker.controller.postMessage({ action, url });
         });
       }
 
@@ -351,71 +366,46 @@
       });
       updateDiagnostics();
 
-      let _lastProgressAt = 0;
+      const stripExt = (path) => path.replace(/\.(m4a|wav|mp4)$/, '');
+
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', (event) => {
-          const { status, url, received, size } = event.data || {};
-          if (!status || !url) return;
+          const { type, status, url, size } = event.data || {};
+          if (type !== 'UI_UPDATE' && !status) return;
+          
+          const effectiveStatus = status || event.data.status;
+          const effectiveUrl = url || event.data.url;
+
           let saveBtn, removeBtn;
           saveButtons.forEach(btn => {
             const audio = btn.closest('.track').querySelector('audio');
             const audioUrl = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
-            if (audioUrl === url) {
+            if (stripExt(audioUrl) === stripExt(effectiveUrl)) {
               saveBtn = btn;
               removeBtn = btn.closest('.track').querySelector('.remove-offline');
             }
           });
           if (!saveBtn || !removeBtn) return;
 
-          if (['downloading','saved','removed','error'].includes(status)) {
-            clearTimeout(offlineTimers.get(url));
-            offlineTimers.delete(url);
-          }
-
-          if (status === 'downloading') {
-            const pct = size ? Math.round((received / size) * 100) : 0;
-            saveBtn.textContent = `Cancel ${pct}%`;
+          if (effectiveStatus === 'downloading') {
+            saveBtn.textContent = 'Cancel';
             saveBtn.disabled = false;
-            saveBtn.classList.remove('disabled');
             saveBtn.dataset.state = 'saving';
-            return;
-          }
-
-          saveBtn.dataset.state = '';
-
-          if (status === 'saved') {
-            offlineMap.set(url, size);
+          } else if (effectiveStatus === 'saved') {
+            offlineMap.set(effectiveUrl, size);
             saveBtn.textContent = 'Saved';
             saveBtn.disabled = true;
-            saveBtn.classList.add('disabled');
+            saveBtn.dataset.state = '';
             removeBtn.disabled = false;
             removeBtn.classList.remove('disabled');
-          } else if (status === 'removed') {
-            offlineMap.delete(url);
+          } else if (effectiveStatus === 'removed') {
+            offlineMap.delete(effectiveUrl);
             saveBtn.textContent = 'Save for offline';
             saveBtn.disabled = false;
-            saveBtn.classList.remove('disabled');
+            saveBtn.dataset.state = '';
             removeBtn.disabled = true;
             removeBtn.classList.add('disabled');
-          } else if (status === 'error') {
-            const why   = event.data?.reason || 'unknown';
-            const info  = event.data?.info;
-            const usage = info?.usage, quota = info?.quota;
-
-            saveBtn.textContent = 'Error';
-            saveBtn.disabled = false;
-            saveBtn.classList.remove('disabled');
-
-            const mb = (n) => (n/1e6).toFixed(1);
-            let msg = `Save failed (${why}).`;
-            if (quota) msg += ` Storage ${mb(usage||0)}/${mb(quota)} MB.`;
-            showToast(msg);
-
-            offlineMap.delete(url);
-            updateDiagnostics();
-            return;
           }
-
           updateDiagnostics();
         });
       }
