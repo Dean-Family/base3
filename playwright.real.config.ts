@@ -27,7 +27,7 @@ export default defineConfig({
     {
       name: 'real-storage',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /.*real-storage\.spec\.ts/
+      testMatch: /.*\.spec\.ts/
     }
   ]
 });
