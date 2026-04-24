@@ -21,16 +21,47 @@ async function scorchedEarth(page: Page) {
   });
 }
 
+/**
+ * RULE 4: Service Worker Telemetry
+ */
+async function setupTelemetry(page: Page) {
+  await page.evaluate(() => { (window as any).telemetryLog = []; });
+  const cbName = `onTel_${Math.floor(Math.random() * 1e9)}`;
+  await page.exposeFunction(cbName, (d: any) => {
+    (window as any).telemetryLog?.push(d);
+  });
+  
+  const browserScript = (name: string) => {
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', (e) => {
+        if (e.data?.isTelemetry) {
+          if (!(window as any).telemetryLog) (window as any).telemetryLog = [];
+          (window as any).telemetryLog.push(e.data);
+          (window as any)[name](e.data);
+        }
+      });
+    }
+  };
+
+  await page.addInitScript(browserScript, cbName);
+  await page.evaluate(browserScript, cbName);
+
+  return {
+    waitFor: async (type: string, timeout = 30000) => {
+      await page.waitForFunction((t) => 
+        (window as any).telemetryLog && (window as any).telemetryLog.some((m: any) => m.type === t), 
+        type, { timeout }
+      );
+    }
+  };
+}
+
 test.describe('Offline UI - Integration', () => {
   test.beforeEach(async ({ page, context }) => {
-    // Intercept music to keep it fast
     await context.route('**/music/**', (r) => r.fulfill({ status: 200, body: Buffer.alloc(1024), contentType: 'audio/mp4' }));
-    
     await page.goto('/');
     await scorchedEarth(page);
     await page.reload();
-    
-    // Wait for real SW
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker?.controller), { timeout: 20000 }).toBeTruthy();
   });
 
@@ -39,10 +70,12 @@ test.describe('Offline UI - Integration', () => {
   });
 
   test('OfflineUI - Successful Save - Button Transitions to Saved', async ({ page }) => {
-    const track = page.locator('.track').first();
+    const tel = await setupTelemetry(page);
+    const track = page.locator('.track', { hasText: 'Lead with Your Hips' });
     const saveBtn = track.locator('.save-offline');
     
     await saveBtn.click();
+    await tel.waitFor('IDB_WRITE_COMPLETE');
     
     // UI should transition to Saved
     await expect(saveBtn).toHaveText('Saved', { timeout: 15000 });
@@ -53,11 +86,9 @@ test.describe('Offline UI - Integration', () => {
   });
 
   test('StorageManager - Persistence Request - Only Triggers on User Gesture', async ({ page }) => {
-    // Mock navigator.storage.persist to track calls
     await page.evaluate(() => {
       (window as any).__persistCount = 0;
       if (navigator.storage && navigator.storage.persist) {
-        const original = navigator.storage.persist.bind(navigator.storage);
         navigator.storage.persist = async () => {
           (window as any).__persistCount++;
           return true;
@@ -65,18 +96,21 @@ test.describe('Offline UI - Integration', () => {
       }
     });
 
-    // Interaction triggers it (first save click in index.html logic)
     await page.locator('.save-offline').first().click();
-
     const count = await page.evaluate(() => (window as any).__persistCount);
     expect(count).toBe(1);
   });
 
   test('InstallFlow - BeforeInstallPrompt - Defers Android Install', async ({ page }) => {
-    const prevented = await page.evaluate(() => {
+    // Wait for the app to be fully initialized
+    await page.waitForFunction(() => (window as any).swReady !== undefined);
+
+    const prevented = await page.evaluate(async () => {
       let isPrevented = false;
-      const event = new Event('beforeinstallprompt') as any;
+      // We need to use a custom event that supports preventDefault
+      const event = new Event('beforeinstallprompt', { cancelable: true }) as any;
       event.preventDefault = () => { isPrevented = true; };
+      
       window.dispatchEvent(event);
       return isPrevented;
     });

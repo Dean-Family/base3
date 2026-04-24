@@ -108,9 +108,32 @@ self.addEventListener('message', e => {
       try {
         await broadcastTelemetry('UI_UPDATE', { status: 'downloading', url: key });
         const res = await fetch(url, { signal: controller.signal });
-        const blob = await res.blob();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const mime = res.headers.get('Content-Type') || mimeFromPath(key);
+        const totalSize = Number.parseInt(res.headers.get('Content-Length') || '0', 10) || 0;
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('No reader');
+
+        const chunks = [];
+        let receivedBytes = 0;
+        let lastUpdateTs = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          receivedBytes += value.byteLength;
+          const now = Date.now();
+          if (now - lastUpdateTs > 200 || receivedBytes === totalSize) {
+            lastUpdateTs = now;
+            await broadcastTelemetry('UI_UPDATE', { status: 'downloading', url: key, received: receivedBytes, size: totalSize });
+          }
+        }
+
+        const blob = new Blob(chunks, { type: mime });
         const db = await openDB();
-        await idbPut(db, 'tracks', { trackKey: key, blob, mime: mimeFromPath(key) });
+        await idbPut(db, 'tracks', { trackKey: key, blob, mime, size: blob.size });
         
         await broadcastTelemetry('IDB_WRITE_COMPLETE', { url: key });
         await broadcastTelemetry('UI_UPDATE', { status: 'saved', url: key, size: blob.size });
