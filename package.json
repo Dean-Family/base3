@@ -1,0 +1,13 @@
+{
+  "name": "base3",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:real": "playwright test --config=playwright.real.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.0",
+    "serve": "^14.2.6"
+  }
+}
