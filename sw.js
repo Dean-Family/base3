@@ -1,7 +1,7 @@
 // sw.js - Service Worker for robust offline audio playback via IndexedDB
 
-const CACHE_NAME = 'base3-shell-v23';
-const SHELL_ASSETS = ['/', '/index.html', '/manifest.json', '/player-state.js', '/images/Base3Logo.jpg'];
+const CACHE_NAME = 'base3-shell-v24';
+const SHELL_ASSETS = ['/', '/index.html', '/manifest.json', '/images/Base3Logo.jpg'];
 
 const DB_NAME = 'base3-media';
 const DB_VERSION = 1;
@@ -76,7 +76,30 @@ async function serveFromIDB(req) {
     });
     db.close();
     if (record?.blob) {
-      return new Response(record.blob, { headers: { 'Content-Type': record.mime || 'audio/mp4' } });
+      const blob = record.blob;
+      const mime = record.mime || 'audio/mp4';
+      const rangeHeader = req.headers.get('range');
+
+      if (rangeHeader) {
+        const match = rangeHeader.match(/^bytes=(\d+)-(\d+)?$/);
+        if (match) {
+          const start = parseInt(match[1], 10);
+          const end = match[2] ? parseInt(match[2], 10) : blob.size - 1;
+          const chunk = blob.slice(start, end + 1);
+
+          return new Response(chunk, {
+            status: 206,
+            statusText: 'Partial Content',
+            headers: {
+              'Content-Type': mime,
+              'Content-Range': `bytes ${start}-${end}/${blob.size}`,
+              'Content-Length': String(chunk.size)
+            }
+          });
+        }
+      }
+
+      return new Response(blob, { headers: { 'Content-Type': mime } });
     }
   } catch (e) {}
   return fetch(req);

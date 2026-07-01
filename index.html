@@ -191,11 +191,9 @@
 
   <!-- JavaScript for enhanced controls -->
   <script type="module">
-    import { wireAudio, resumeIfPossible } from './player-state.js';
-
     document.addEventListener('DOMContentLoaded', () => {
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js?v=6.0.0')
+        navigator.serviceWorker.register('/sw.js?v=6.1.0')
           .then(reg => console.log('Service Worker registered:', reg.scope))
           .catch(err => console.log('Service Worker registration failed:', err));
       }
@@ -263,21 +261,119 @@
       let currentIndex = 0;
       let persistenceTried = false;
 
-      const toKey = a =>
-        new URL(
-          a.querySelector('source')?.getAttribute('src') || a.currentSrc || a.src || '',
-          location.href
-        ).pathname;
-      tracks.forEach(t => wireAudio(t, toKey));
-      tracks.forEach(t => resumeIfPossible(t));
+      const DB_NAME = 'base3';
+      const STORE = 'playback_state';
+      const DB_VERSION = 5;
 
-      const dbReq = indexedDB.open('base3', 5);
-      dbReq.onsuccess = () => {
-        const db = dbReq.result;
-        dbInfo.textContent = `DB: v${db.version}`;
-        db.onversionchange = () => db.close();
-        db.close();
+      function openDB() {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open(DB_NAME, DB_VERSION);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STORE)) {
+              db.createObjectStore(STORE, { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = () => {
+            const db = req.result;
+            db.onversionchange = () => db.close();
+            resolve(db);
+          };
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      function getPlaybackState(db, id) {
+        return new Promise((resolve, reject) => {
+          try {
+            const tx = db.transaction(STORE, 'readonly');
+            const req = tx.objectStore(STORE).get(id);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+
+      function savePlaybackState(db, trackKey, currentTime, now) {
+        return new Promise((resolve, reject) => {
+          try {
+            const tx = db.transaction(STORE, 'readwrite');
+            const store = tx.objectStore(STORE);
+            store.put({ id: trackKey, currentTime, updatedAt: now });
+            store.put({ id: 'last-active-track', trackKey, updatedAt: now });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+
+      function wireAudio(audio, urlForTrackKeyFn) {
+        audio.addEventListener('play', async () => {
+          try {
+            const trackKey = urlForTrackKeyFn(audio);
+            const db = await openDB();
+            const state = await getPlaybackState(db, trackKey);
+            db.close();
+            if (state && state.currentTime) {
+              if (Math.abs(audio.currentTime - state.currentTime) > 2) {
+                audio.currentTime = state.currentTime;
+              }
+            }
+          } catch (e) {
+            /* ignore */
+          }
+        });
+
+        let lastSave = 0;
+        audio.addEventListener('timeupdate', async () => {
+          const now = Date.now();
+          if (now - lastSave < 2000) return;
+          lastSave = now;
+
+          try {
+            const trackKey = urlForTrackKeyFn(audio);
+            const db = await openDB();
+            await savePlaybackState(db, trackKey, audio.currentTime, now);
+            db.close();
+          } catch (e) {
+            /* ignore */
+          }
+        });
+      }
+
+      const toKey = a => {
+        const srcAttr = a.currentSrc || a.querySelector('source')?.getAttribute('src') || '';
+        return new URL(srcAttr, location.href).pathname;
       };
+
+      tracks.forEach(t => wireAudio(t, toKey));
+
+      // Resume last active track and initialize DB info on startup
+      (async () => {
+        try {
+          const db = await openDB();
+          dbInfo.textContent = `DB: v${db.version}`;
+          const last = await getPlaybackState(db, 'last-active-track');
+          if (last && last.trackKey) {
+            for (const audio of tracks) {
+              if (toKey(audio) === last.trackKey) {
+                const state = await getPlaybackState(db, last.trackKey);
+                if (state && state.currentTime) {
+                  audio.currentTime = state.currentTime;
+                }
+                break;
+              }
+            }
+          }
+          db.close();
+        } catch (e) {
+          dbInfo.textContent = 'DB: err';
+        }
+      })();
 
       const swReady = 'serviceWorker' in navigator
         ? new Promise(resolve => {
@@ -327,7 +423,7 @@
       saveButtons.forEach(button => {
         button.addEventListener('click', async () => {
           const audio = button.closest('.track').querySelector('audio');
-          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          const url = toKey(audio);
           if (!url || url === location.pathname) {
             showToast('No audio source available');
             return;
@@ -367,7 +463,7 @@
         button.classList.add('disabled');
         button.addEventListener('click', () => {
           const audio = button.closest('.track').querySelector('audio');
-          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          const url = toKey(audio);
           sendToServiceWorker('remove', url);
         });
       });
@@ -377,7 +473,7 @@
         offlineList.innerHTML = '';
         saveButtons.forEach(btn => {
           const audio = btn.closest('.track').querySelector('audio');
-          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          const url = toKey(audio);
           const size = offlineMap.get(url) || 0;
           if (size) bytes += size;
           const li = document.createElement('li');
@@ -395,7 +491,7 @@
       recalcBtn.addEventListener('click', () => {
         saveButtons.forEach(btn => {
           const audio = btn.closest('.track').querySelector('audio');
-          const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+          const url = toKey(audio);
           sendToServiceWorker('check', url);
         });
       });
@@ -403,7 +499,7 @@
       // Check cache status on load
       saveButtons.forEach(button => {
         const audio = button.closest('.track').querySelector('audio');
-        const url = new URL(audio.currentSrc || audio.src || '', location.href).pathname;
+        const url = toKey(audio);
         sendToServiceWorker('check', url);
       });
       updateDiagnostics();
