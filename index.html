@@ -193,7 +193,7 @@
   <script type="module">
     document.addEventListener('DOMContentLoaded', () => {
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js?v=6.1.0')
+        navigator.serviceWorker.register('/sw.js?v=6.2.0')
           .then(reg => console.log('Service Worker registered:', reg.scope))
           .catch(err => console.log('Service Worker registration failed:', err));
       }

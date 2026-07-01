@@ -1,6 +1,6 @@
 // sw.js - Service Worker for robust offline audio playback via IndexedDB
 
-const CACHE_NAME = 'base3-shell-v24';
+const CACHE_NAME = 'base3-shell-v25';
 const SHELL_ASSETS = ['/', '/index.html', '/manifest.json', '/images/Base3Logo.jpg'];
 
 const DB_NAME = 'base3-media';
@@ -102,20 +102,28 @@ async function serveFromIDB(req) {
           const start = parseInt(match[1], 10);
           const end = match[2] ? parseInt(match[2], 10) : blob.size - 1;
           const chunk = blob.slice(start, end + 1);
+          const buffer = await chunk.arrayBuffer();
 
-          return new Response(chunk, {
+          return new Response(buffer, {
             status: 206,
             statusText: 'Partial Content',
             headers: {
               'Content-Type': mime,
               'Content-Range': `bytes ${start}-${end}/${blob.size}`,
-              'Content-Length': String(chunk.size)
+              'Content-Length': String(chunk.size),
+              'Accept-Ranges': 'bytes'
             }
           });
         }
       }
 
-      return new Response(blob, { headers: { 'Content-Type': mime } });
+      const buffer = await blob.arrayBuffer();
+      return new Response(buffer, {
+        headers: {
+          'Content-Type': mime,
+          'Accept-Ranges': 'bytes'
+        }
+      });
     }
   } catch (e) {}
   return fetch(req);
