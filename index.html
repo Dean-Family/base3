@@ -11,24 +11,177 @@
   <title>Base 3 - Album Player</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; background-color: #222; color: #fff; }
+    body.js-enabled { padding-bottom: 130px; }
     .logo { margin-top: 20px; width: 80%; max-width: 400px; border-radius: 10px; }
     .track { width: 90%; margin: 10px 0; padding: 10px; background: #333; border-radius: 5px; display: flex; flex-direction: column; align-items: center; }
     /* Darker background for active tracks to maintain link contrast */
     .track.active { border: 2px solid #1db954; background: #2b2b2b; }
     .track audio { width: 100%; }
+    body.js-enabled .track audio { display: none; }
     .track-info { margin-top: 8px; }
     /* Brighter green ensures sufficient contrast on all backgrounds */
     .download-link { color: #1ed760; text-decoration: none; font-weight: bold; margin-top: 5px; }
     .download-link:hover { text-decoration: underline; }
-    button { padding: 10px 20px; margin: 10px; background-color: #1db954; border: none; color: white; cursor: pointer; border-radius: 5px; }
+    button { padding: 10px 20px; margin: 10px; background-color: #1db954; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold; }
     button.disabled { background-color: #555; cursor: not-allowed; }
     button:hover:not(.disabled) { background-color: #17a74e; }
+    
+    .js-play-btn { display: none; }
+    body.js-enabled .js-play-btn { display: inline-block; background-color: #1db954; min-width: 100px; }
+    body.js-enabled .js-play-btn.playing { background-color: #e21b3c; }
+
+    /* Sticky Bottom Global Player */
+    .global-player { display: none; }
+    body.js-enabled .global-player.visible { display: flex; }
+    body.js-enabled .global-player {
+      display: none;
+      flex-direction: column;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(30, 30, 30, 0.85);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 1000;
+      box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+      box-sizing: border-box;
+      width: 100%;
+      transition: transform 0.3s ease;
+    }
+    .player-progress-container {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      padding: 6px 20px;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .player-progress-container span {
+      font-size: 0.85em;
+      color: #ccc;
+      font-family: monospace;
+    }
+    .player-progress-container input[type="range"] {
+      flex: 1;
+      margin: 0 12px;
+      cursor: pointer;
+      accent-color: #1db954;
+      height: 6px;
+      border-radius: 3px;
+    }
+    .player-controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .player-track-info-container {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+      margin-right: 10px;
+    }
+    .player-artwork {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      margin-right: 12px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .player-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .player-title {
+      font-size: 0.95em;
+      font-weight: bold;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .player-artist {
+      font-size: 0.8em;
+      color: #aaa;
+      margin-top: 2px;
+    }
+    .player-btn-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .player-btn-group button {
+      padding: 0;
+      margin: 0;
+      font-size: 1.25em;
+      background: transparent;
+      color: #fff;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .player-btn-group button:hover:not(.disabled) {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .player-btn-group button#player-play-toggle {
+      background: #fff;
+      color: #000;
+      width: 50px;
+      height: 50px;
+      font-size: 1.4em;
+    }
+    .player-btn-group button#player-play-toggle:hover {
+      background: #e0e0e0;
+    }
+    .player-btn-group button.active-mode {
+      color: #1db954;
+      text-shadow: 0 0 8px rgba(29, 185, 84, 0.4);
+    }
+    
     @media (max-width: 600px) {
       body { padding: 10px; }
+      body.js-enabled { padding-bottom: 140px; }
       .logo { width: 100%; max-width: 300px; }
       .track { width: 100%; padding: 8px; margin: 8px 0; }
       .track-info { font-size: 0.9em; }
       button { padding: 8px 16px; font-size: 0.9em; }
+      
+      .player-controls-row {
+        padding: 10px 15px;
+      }
+      .player-artwork {
+        width: 40px;
+        height: 40px;
+        margin-right: 8px;
+      }
+      .player-btn-group {
+        gap: 6px;
+      }
+      .player-btn-group button {
+        width: 38px;
+        height: 38px;
+        font-size: 1.1em;
+      }
+      .player-btn-group button#player-play-toggle {
+        width: 44px;
+        height: 44px;
+        font-size: 1.25em;
+      }
     }
   </style>
 </head>
@@ -56,6 +209,7 @@
     <div class="track-info">01. Lead with Your Hips</div>
     <a class="download-link" href="music/Lead_with_Your_Hips.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Lead_with_Your_Hips.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -69,6 +223,7 @@
     <div class="track-info">02. Midnight Attitude</div>
     <a class="download-link" href="music/Midnight_Attitude.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Midnight_Attitude.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -82,6 +237,7 @@
     <div class="track-info">03. Full Capacity</div>
     <a class="download-link" href="music/Full_Capacity.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Full_Capacity.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -95,6 +251,7 @@
     <div class="track-info">04. Deep Sleep</div>
     <a class="download-link" href="music/Deep_Sleep.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Deep_Sleep.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -108,6 +265,7 @@
     <div class="track-info">05. Level 9</div>
     <a class="download-link" href="music/Level_9.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Level_9.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -121,6 +279,7 @@
     <div class="track-info">06. windy</div>
     <a class="download-link" href="music/windy.m4a" download>Download M4A</a>
     <a class="download-link" href="music/windy.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -134,6 +293,7 @@
     <div class="track-info">07. T-Rex T-Rex</div>
     <a class="download-link" href="music/T-Rex_T-Rex.m4a" download>Download M4A</a>
     <a class="download-link" href="music/T-Rex_T-Rex.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -147,6 +307,7 @@
     <div class="track-info">08. Walking on the C</div>
     <a class="download-link" href="music/Walking_on_the_C.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Walking_on_the_C.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -160,6 +321,7 @@
     <div class="track-info">09. Won 2 1</div>
     <a class="download-link" href="music/Won_2_1.m4a" download>Download M4A</a>
     <a class="download-link" href="music/Won_2_1.wav" download>Download WAV</a>
+    <button class="js-play-btn disabled" disabled>▶ Play</button>
     <button class="save-offline">Save for offline</button>
     <button class="remove-offline">Remove from offline</button>
   </div>
@@ -175,6 +337,30 @@
     <button id="clear-cache">Clear All Caches</button>
     <ul id="cache-list" style="list-style:none;padding-left:0;max-height:150px;overflow-y:auto;margin-top:10px;"></ul>
   </section>
+
+  <!-- Sticky Bottom Player Bar (only visible when js-enabled) -->
+  <div id="global-player" class="global-player">
+    <div class="player-progress-container">
+      <span id="player-time-current">0:00</span>
+      <input type="range" id="player-seek" min="0" max="100" value="0" aria-label="Seek track" />
+      <span id="player-time-duration">0:00</span>
+    </div>
+    <div class="player-controls-row">
+      <div class="player-track-info-container">
+        <img src="images/Base3Logo.jpg" alt="Artwork" class="player-artwork" />
+        <div class="player-text">
+          <div id="player-track-title" class="player-title">Track Title</div>
+          <div class="player-artist">Gavin</div>
+        </div>
+      </div>
+      <div class="player-btn-group">
+        <button id="player-prev" aria-label="Previous Track">⏮</button>
+        <button id="player-play-toggle" aria-label="Play/Pause">▶</button>
+        <button id="player-next" aria-label="Next Track">⏭</button>
+        <button id="player-repeat" aria-label="Toggle Repeat" title="Repeat Mode">🔁</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Fallback message for users with JavaScript disabled -->
   <noscript>
@@ -202,11 +388,8 @@
       const installBtn = document.getElementById('install-btn');
 
       window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent the mini-infobar from appearing on mobile
         e.preventDefault();
-        // Stash the event so it can be triggered later.
         deferredPrompt = e;
-        // Update UI notify the user they can install the PWA
         if (installBtn) {
           installBtn.style.display = 'block';
           installBtn.classList.remove('hidden');
@@ -215,22 +398,16 @@
 
       installBtn?.addEventListener('click', async () => {
         if (!deferredPrompt) return;
-        // Show the install prompt
         deferredPrompt.prompt();
-        // Wait for the user to respond to the prompt
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to the install prompt: ${outcome}`);
-        // We've used the prompt, and can't use it again, throw it away
         deferredPrompt = null;
-        // Hide the install button
         installBtn.style.display = 'none';
         installBtn.classList.add('hidden');
       });
 
       window.addEventListener('appinstalled', () => {
-        // Clear the deferredPrompt so it can be garbage collected
         deferredPrompt = null;
-        // Hide the install button
         if (installBtn) {
           installBtn.style.display = 'none';
           installBtn.classList.add('hidden');
@@ -238,16 +415,34 @@
         console.log('PWA was installed');
       });
 
-      // Enable buttons when JavaScript is available
+      // Enable custom JS mode and buttons
+      document.body.classList.add('js-enabled');
+
+      const playButtons = document.querySelectorAll('.js-play-btn');
       const autoplayToggle = document.getElementById('autoplay-toggle');
       const prevBtn = document.getElementById('prev');
       const nextBtn = document.getElementById('next');
-      [autoplayToggle, prevBtn, nextBtn].filter(Boolean).forEach(btn => {
+
+      [...playButtons, autoplayToggle, prevBtn, nextBtn].filter(Boolean).forEach(btn => {
         btn.classList.remove('disabled');
         btn.disabled = false;
       });
 
+      // Bottom player UI elements
+      const globalPlayer = document.getElementById('global-player');
+      const playerPlayToggle = document.getElementById('player-play-toggle');
+      const playerPrev = document.getElementById('player-prev');
+      const playerNext = document.getElementById('player-next');
+      const playerRepeat = document.getElementById('player-repeat');
+      const playerSeek = document.getElementById('player-seek');
+      const playerTimeCurrent = document.getElementById('player-time-current');
+      const playerTimeDuration = document.getElementById('player-time-duration');
+      const playerTrackTitle = document.getElementById('player-track-title');
+
+      let repeatMode = 'off'; // 'off' | 'all' | 'one'
+      let isSeeking = false;
       let autoplay = false;
+
       const tracks = document.querySelectorAll('.track audio');
       const trackContainers = document.querySelectorAll('.track');
       const saveButtons = document.querySelectorAll('.save-offline');
@@ -359,12 +554,15 @@
           dbInfo.textContent = `DB: v${db.version}`;
           const last = await getPlaybackState(db, 'last-active-track');
           if (last && last.trackKey) {
-            for (const audio of tracks) {
+            for (let i = 0; i < tracks.length; i++) {
+              const audio = tracks[i];
               if (toKey(audio) === last.trackKey) {
                 const state = await getPlaybackState(db, last.trackKey);
                 if (state && state.currentTime) {
                   audio.currentTime = state.currentTime;
                 }
+                currentIndex = i;
+                syncPlayerUI(audio, false);
                 break;
               }
             }
@@ -415,12 +613,13 @@
         const div = document.createElement('div');
         div.textContent = msg;
         div.style.position = 'fixed';
-        div.style.bottom = '10px';
+        div.style.bottom = '140px';
         div.style.left = '50%';
         div.style.transform = 'translateX(-50%)';
         div.style.background = '#333';
         div.style.padding = '6px 10px';
         div.style.borderRadius = '4px';
+        div.style.zIndex = '2000';
         document.body.appendChild(div);
         setTimeout(() => div.remove(), 3000);
       }
@@ -515,7 +714,7 @@
         navigator.serviceWorker.addEventListener('message', (event) => {
           const { type, status, url, size } = event.data || {};
           if (type !== 'UI_UPDATE' && !status) return;
-          
+
           const effectiveStatus = status || event.data.status;
           const effectiveUrl = url || event.data.url;
 
@@ -595,39 +794,228 @@
 
       refreshCacheList();
 
-      // Autoplay toggle
+      // Autoplay / Repeat states sync
+      function cycleRepeatMode() {
+        if (repeatMode === 'off') {
+          repeatMode = 'all';
+        } else if (repeatMode === 'all') {
+          repeatMode = 'one';
+        } else {
+          repeatMode = 'off';
+        }
+        updateRepeatUI();
+      }
+
+      function updateRepeatUI() {
+        if (repeatMode === 'off') {
+          playerRepeat.textContent = '🔁';
+          playerRepeat.classList.remove('active-mode');
+          playerRepeat.title = 'Repeat Off (No Autoplay)';
+          autoplay = false;
+          if (autoplayToggle) autoplayToggle.textContent = 'Autoplay: Off';
+        } else if (repeatMode === 'all') {
+          playerRepeat.textContent = '🔁';
+          playerRepeat.classList.add('active-mode');
+          playerRepeat.title = 'Repeat All (Autoplay On)';
+          autoplay = true;
+          if (autoplayToggle) autoplayToggle.textContent = 'Autoplay: On';
+        } else if (repeatMode === 'one') {
+          playerRepeat.textContent = '🔂';
+          playerRepeat.classList.add('active-mode');
+          playerRepeat.title = 'Repeat One';
+          autoplay = false;
+          if (autoplayToggle) autoplayToggle.textContent = 'Autoplay: Off';
+        }
+      }
+
+      playerRepeat.addEventListener('click', cycleRepeatMode);
+
       autoplayToggle?.addEventListener('click', () => {
         autoplay = !autoplay;
-        autoplayToggle.textContent = `Autoplay: ${autoplay ? 'On' : 'Off'}`;
+        repeatMode = autoplay ? 'all' : 'off';
+        updateRepeatUI();
       });
 
-      // Play selected track and update highlight
+      // UI Time Formatting
+      function formatTime(secs) {
+        if (isNaN(secs) || secs === Infinity) return '0:00';
+        const m = Math.floor(secs / 60);
+        const s = Math.floor(secs % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+      }
+
+      // Sync specific audio element state with UI
+      function syncPlayerUI(audio, showBar = true) {
+        const index = Array.from(tracks).indexOf(audio);
+        const title = trackContainers[index].querySelector('.track-info').textContent;
+        playerTrackTitle.textContent = title;
+
+        if (showBar) {
+          globalPlayer.classList.add('visible');
+        }
+
+        // Play/Pause icon toggles
+        if (audio.paused) {
+          playerPlayToggle.textContent = '▶';
+          playButtons[index].textContent = '▶ Play';
+          playButtons[index].classList.remove('playing');
+        } else {
+          playerPlayToggle.textContent = '⏸';
+          playButtons[index].textContent = '⏸ Pause';
+          playButtons[index].classList.add('playing');
+        }
+
+        // Seeker ranges
+        if (!isSeeking) {
+          playerSeek.max = audio.duration || 100;
+          playerSeek.value = audio.currentTime || 0;
+          playerTimeCurrent.textContent = formatTime(audio.currentTime);
+          playerTimeDuration.textContent = formatTime(audio.duration);
+        }
+
+        // Highlight active track container
+        trackContainers.forEach((tc, i) => {
+          if (i === index) {
+            tc.classList.add('active');
+          } else {
+            tc.classList.remove('active');
+          }
+        });
+
+        currentIndex = index;
+
+        // Media Session API Support
+        updateMediaSession(title, audio);
+      }
+
+      function updateMediaSession(title, audio) {
+        if (!('mediaSession' in navigator)) return;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: title.replace(/^\d+\.\s*/, ''),
+          artist: 'Gavin',
+          album: 'Base 3',
+          artwork: [
+            { src: 'images/Base3Logo.jpg', sizes: '512x512', type: 'image/jpeg' }
+          ]
+        });
+
+        navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+      }
+
+      // Media Session Action Handlers
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => {
+          const audio = tracks[currentIndex];
+          audio.play().catch(err => console.warn(err));
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          const audio = tracks[currentIndex];
+          audio.pause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          playTrack(currentIndex - 1);
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          playTrack(currentIndex + 1);
+        });
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          const audio = tracks[currentIndex];
+          if (details.seekTime !== undefined) {
+            audio.currentTime = details.seekTime;
+          }
+        });
+      }
+
+      // Play selected track index
       function playTrack(index) {
         if (index < 0) index = tracks.length - 1;
         else if (index >= tracks.length) index = 0;
 
-        tracks.forEach(t => { if (!t.paused) t.pause(); });
-        trackContainers[currentIndex].classList.remove('active');
-        tracks[index].play();
-        trackContainers[index].classList.add('active');
-        currentIndex = index;
+        const audio = tracks[index];
+        tracks.forEach(t => { if (t !== audio && !t.paused) t.pause(); });
+        
+        audio.play().catch(err => {
+          console.warn('Playback block or error:', err);
+        });
+        syncPlayerUI(audio);
       }
 
-      // Navigation
+      // Individual play buttons
+      playButtons.forEach((btn, index) => {
+        btn.addEventListener('click', () => {
+          const audio = tracks[index];
+          if (audio.paused) {
+            playTrack(index);
+          } else {
+            audio.pause();
+          }
+        });
+      });
+
+      // Bottom bar control buttons
+      playerPlayToggle.addEventListener('click', () => {
+        const audio = tracks[currentIndex];
+        if (audio.paused) {
+          audio.play().catch(err => console.warn(err));
+        } else {
+          audio.pause();
+        }
+      });
+
+      playerPrev.addEventListener('click', () => playTrack(currentIndex - 1));
+      playerNext.addEventListener('click', () => playTrack(currentIndex + 1));
       prevBtn?.addEventListener('click', () => playTrack(currentIndex - 1));
       nextBtn?.addEventListener('click', () => playTrack(currentIndex + 1));
 
-      // Sync UI and optionally autoplay next
-      tracks.forEach((track, index) => {
-        track.addEventListener('play', function () {
-          tracks.forEach(other => { if (other !== this && !other.paused) other.pause(); });
-          trackContainers.forEach(t => t.classList.remove('active'));
-          trackContainers[index].classList.add('active');
-          currentIndex = index;
+      // Seeker input / change handlers
+      playerSeek.addEventListener('input', () => {
+        isSeeking = true;
+        playerTimeCurrent.textContent = formatTime(playerSeek.value);
+      });
+
+      playerSeek.addEventListener('change', () => {
+        const audio = tracks[currentIndex];
+        audio.currentTime = parseFloat(playerSeek.value);
+        isSeeking = false;
+      });
+
+      // Audio Event Listeners for synchronizing and ended triggers
+      tracks.forEach((audio, index) => {
+        audio.addEventListener('ended', () => {
+          if (repeatMode === 'one') {
+            audio.currentTime = 0;
+            audio.play().catch(err => console.warn(err));
+          } else if (repeatMode === 'all') {
+            playTrack(index + 1);
+          } else {
+            syncPlayerUI(audio);
+          }
         });
 
-        track.addEventListener('ended', () => {
-          if (autoplay) playTrack(index + 1);
+        audio.addEventListener('timeupdate', () => {
+          const activeAudio = tracks[currentIndex];
+          if (audio === activeAudio && !isSeeking) {
+            playerSeek.value = audio.currentTime;
+            playerTimeCurrent.textContent = formatTime(audio.currentTime);
+          }
+        });
+
+        audio.addEventListener('durationchange', () => {
+          const activeAudio = tracks[currentIndex];
+          if (audio === activeAudio) {
+            playerSeek.max = audio.duration;
+            playerTimeDuration.textContent = formatTime(audio.duration);
+          }
+        });
+
+        audio.addEventListener('play', () => {
+          tracks.forEach(other => { if (other !== audio && !other.paused) other.pause(); });
+          syncPlayerUI(audio);
+        });
+
+        audio.addEventListener('pause', () => {
+          syncPlayerUI(audio);
         });
       });
     });
