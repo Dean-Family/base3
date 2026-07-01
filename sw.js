@@ -57,7 +57,23 @@ function mimeFromPath(p) {
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(SHELL_ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(async cache => {
+      for (const url of SHELL_ASSETS) {
+        try {
+          const req = new Request(url, { cache: 'reload' });
+          const res = await fetch(req);
+          if (res.status === 200) {
+            await cache.put(req, res);
+          } else {
+            originalLog(`[SW] Skip caching ${url} due to status ${res.status}`);
+          }
+        } catch (err) {
+          originalLog(`[SW] Failed to cache ${url}: ${err.message}`);
+        }
+      }
+    })
+  );
 });
 
 self.addEventListener('activate', e => {
