@@ -54,9 +54,13 @@ self.addEventListener('install', e => {
     caches.open(CACHE_NAME).then(async cache => {
       for (const url of SHELL_ASSETS) {
         try {
-          const res = await fetch(url, { cache: 'reload' });
+          const fetchUrl = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+          const res = await fetch(fetchUrl, { cache: 'reload' });
           if (!res.ok) {
             throw new Error(`Failed to fetch ${url}: ${res.status}`);
+          }
+          if (res.status === 206) {
+            throw new Error(`Received unexpected 206 Partial Content for ${url}`);
           }
           await cache.put(url, res.clone());
         } catch (err) {
