@@ -10,14 +10,26 @@
   <meta name="theme-color" content="#1db954" />
   <title>Base 3 - Album Player</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; background-color: #222; color: #fff; }
-    body.js-enabled { padding-bottom: 130px; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #121212;
+      background: radial-gradient(circle at top left, #1c3325 0%, #121212 70%);
+      background-attachment: fixed;
+      color: #fff;
+    }
+    body.js-enabled {
+      padding-bottom: 40px;
+    }
     .logo { margin-top: 20px; width: 80%; max-width: 400px; border-radius: 10px; }
     .track { width: 90%; margin: 10px 0; padding: 10px; background: #333; border-radius: 5px; display: flex; flex-direction: column; align-items: center; }
     /* Darker background for active tracks to maintain link contrast */
     .track.active { border: 2px solid #1db954; background: #2b2b2b; }
     .track audio { width: 100%; }
-    body.js-enabled .track audio { display: none; }
     .track-info { margin-top: 8px; }
     /* Brighter green ensures sufficient contrast on all backgrounds */
     .download-link { color: #1ed760; text-decoration: none; font-weight: bold; margin-top: 5px; }
@@ -27,160 +39,362 @@
     button:hover:not(.disabled) { background-color: #17a74e; }
     
     .js-play-btn { display: none; }
-    body.js-enabled .js-play-btn { display: inline-block; background-color: #1db954; min-width: 100px; }
-    body.js-enabled .js-play-btn.playing { background-color: #e21b3c; }
-
-    /* Sticky Bottom Global Player */
     .global-player { display: none; }
-    body.js-enabled .global-player.visible { display: flex; }
-    body.js-enabled .global-player {
+
+    /* Hide standard UI in PWA/JS mode */
+    body.js-enabled > .logo,
+    body.js-enabled > #autoplay-toggle,
+    body.js-enabled > div:has(#prev),
+    body.js-enabled > #debug-tools,
+    body.js-enabled > footer {
+      display: none !important;
+    }
+
+    /* Spotify SPA container styling */
+    .app-container {
       display: none;
-      flex-direction: column;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(30, 30, 30, 0.85);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      z-index: 1000;
-      box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+      grid-template-columns: 380px 1fr;
+      gap: 30px;
+      width: 95%;
+      max-width: 1200px;
+      margin: 40px auto;
+      background: rgba(22, 22, 22, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 30px;
       box-sizing: border-box;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    }
+    body.js-enabled .app-container {
+      display: grid;
+    }
+
+    /* Left panel player card */
+    .player-panel {
+      position: sticky;
+      top: 30px;
+      height: fit-content;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .now-playing-card {
       width: 100%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .artwork-wrapper {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      margin: 0 auto 20px auto;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
       transition: transform 0.3s ease;
     }
-    .player-progress-container {
+    .artwork-wrapper:hover {
+      transform: scale(1.02);
+    }
+    .app-artwork-img {
       width: 100%;
-      display: flex;
-      align-items: center;
-      padding: 6px 20px;
-      box-sizing: border-box;
-      background: rgba(0, 0, 0, 0.2);
-    }
-    .player-progress-container span {
-      font-size: 0.85em;
-      color: #ccc;
-      font-family: monospace;
-    }
-    .player-progress-container input[type="range"] {
-      flex: 1;
-      margin: 0 12px;
-      cursor: pointer;
-      accent-color: #1db954;
-      height: 6px;
-      border-radius: 3px;
-    }
-    .player-controls-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .player-track-info-container {
-      display: flex;
-      align-items: center;
-      flex: 1;
-      min-width: 0;
-      margin-right: 10px;
-    }
-    .player-artwork {
-      width: 48px;
-      height: 48px;
-      border-radius: 6px;
-      margin-right: 12px;
+      height: 100%;
       object-fit: cover;
-      flex-shrink: 0;
-      border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    .player-text {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-    .player-title {
-      font-size: 0.95em;
-      font-weight: bold;
+    .track-meta h2 {
+      font-size: 1.3em;
+      margin: 0 0 4px 0;
       color: #fff;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .player-artist {
-      font-size: 0.8em;
-      color: #aaa;
-      margin-top: 2px;
+    .track-meta .artist-name {
+      font-size: 0.9em;
+      color: #b3b3b3;
+      margin: 0;
     }
-    .player-btn-group {
+    .progress-bar-group {
+      width: 100%;
+      margin-top: 24px;
+    }
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8em;
+      color: #b3b3b3;
+      margin-bottom: 6px;
+      font-family: monospace;
+    }
+    input[type="range"]#app-seek {
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      outline: none;
+      background: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      accent-color: #1ed760;
+      -webkit-appearance: none;
+    }
+    input[type="range"]#app-seek::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #1ed760;
+      box-shadow: 0 0 8px rgba(30, 215, 96, 0.8);
+      cursor: pointer;
+    }
+    .control-buttons {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 16px;
+      margin-top: 24px;
     }
-    .player-btn-group button {
-      padding: 0;
-      margin: 0;
-      font-size: 1.25em;
+    .circle-btn {
       background: transparent;
-      color: #fff;
-      border-radius: 50%;
+      border: none;
+      color: #a7a7a7;
+      font-size: 1.3em;
       width: 44px;
       height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+    .circle-btn:hover {
+      color: #fff;
+      background: rgba(255,255,255,0.08);
+    }
+    .circle-btn.active-mode {
+      color: #1db954;
+      text-shadow: 0 0 6px rgba(29, 185, 84, 0.4);
+    }
+    .play-trigger-btn {
+      background: #fff;
       border: none;
+      color: #000;
+      font-size: 1.5em;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, background 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .play-trigger-btn:hover {
+      transform: scale(1.04);
+      background: #e6e6e6;
+    }
+    .play-trigger-btn.playing {
+      background: #1db954;
+      color: #fff;
+    }
+
+    /* Right panel tracklist */
+    .tracklist-panel {
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-header {
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-header h1 {
+      font-size: 2.2em;
+      margin: 0;
+      color: #fff;
+      font-weight: 800;
+    }
+    .panel-header .subtitle {
+      font-size: 0.9em;
+      color: #b3b3b3;
+      margin: 4px 0 0 0;
+    }
+    .app-tracklist {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-y: auto;
+      max-height: 580px;
+      padding-right: 6px;
+    }
+    
+    /* Progressive enhancement row overrides */
+    body.js-enabled .track {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 10px 16px !important;
+      background: transparent !important;
+      border-radius: 8px !important;
+      box-sizing: border-box !important;
+      border: none !important;
+      gap: 16px;
       cursor: pointer;
       transition: background 0.2s;
     }
-    .player-btn-group button:hover:not(.disabled) {
-      background: rgba(255, 255, 255, 0.1);
+    body.js-enabled .track:hover {
+      background: rgba(255, 255, 255, 0.05) !important;
     }
-    .player-btn-group button#player-play-toggle {
-      background: #fff;
-      color: #000;
-      width: 50px;
-      height: 50px;
-      font-size: 1.4em;
+    body.js-enabled .track.active {
+      background: rgba(29, 185, 84, 0.1) !important;
     }
-    .player-btn-group button#player-play-toggle:hover {
-      background: #e0e0e0;
+    body.js-enabled .track.active .track-info {
+      color: #1ed760;
     }
-    .player-btn-group button.active-mode {
-      color: #1db954;
-      text-shadow: 0 0 8px rgba(29, 185, 84, 0.4);
+
+    /* Reordering children inside .track in JS mode */
+    body.js-enabled .track audio {
+      display: none !important;
+    }
+    body.js-enabled .track .js-play-btn {
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      order: 1;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: #b3b3b3;
+      cursor: pointer;
+      font-size: 1.1em;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+    }
+    body.js-enabled .track.active .js-play-btn {
+      color: #1ed760;
     }
     
-    @media (max-width: 600px) {
-      body { padding: 10px; }
-      body.js-enabled { padding-bottom: 140px; }
-      .logo { width: 100%; max-width: 300px; }
-      .track { width: 100%; padding: 8px; margin: 8px 0; }
-      .track-info { font-size: 0.9em; }
-      button { padding: 8px 16px; font-size: 0.9em; }
-      
-      .player-controls-row {
-        padding: 10px 15px;
+    body.js-enabled .track .track-info {
+      order: 2;
+      flex: 1;
+      margin: 0;
+      font-size: 0.95em;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+    
+    body.js-enabled .track .download-link {
+      order: 3;
+      font-size: 0.7em;
+      padding: 4px 8px;
+      background: rgba(255,255,255,0.08);
+      color: #ccc;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      transition: background 0.2s, color 0.2s;
+      margin: 0;
+    }
+    body.js-enabled .track .download-link:hover {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      text-decoration: none;
+    }
+
+    body.js-enabled .track .save-offline,
+    body.js-enabled .track .remove-offline {
+      order: 4;
+      font-size: 0.8em;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: transparent;
+      border: 1px solid #727272;
+      color: #ccc;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+      margin: 0;
+      min-width: 85px;
+    }
+    body.js-enabled .track .save-offline:hover,
+    body.js-enabled .track .remove-offline:hover:not(.disabled) {
+      border-color: #fff;
+      color: #fff;
+      transform: scale(1.02);
+    }
+    
+    body.js-enabled .track .save-offline[disabled] {
+      background: rgba(29, 185, 84, 0.15);
+      border-color: #1db954;
+      color: #1ed760;
+      cursor: default;
+    }
+    body.js-enabled .track .save-offline[data-state="saving"] {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: #aaa;
+      color: #aaa;
+    }
+
+    body.js-enabled .track .remove-offline.disabled {
+      display: none !important;
+    }
+    body.js-enabled .track .save-offline[disabled] {
+      display: none !important;
+    }
+    body.js-enabled .track .save-offline {
+      display: inline-block !important;
+    }
+    body.js-enabled .track .remove-offline {
+      display: inline-block !important;
+      background: rgba(29, 185, 84, 0.15);
+      border-color: #1db954;
+      color: #1ed760;
+    }
+    body.js-enabled .track .remove-offline:hover {
+      background: rgba(226, 27, 60, 0.15);
+      border-color: #e21b3c;
+      color: #ff5555;
+    }
+
+    @media (max-width: 900px) {
+      body.js-enabled {
+        padding-bottom: 20px;
       }
-      .player-artwork {
-        width: 40px;
-        height: 40px;
-        margin-right: 8px;
+      .app-container {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        margin: 15px auto;
+        padding: 16px;
+        width: 98%;
       }
-      .player-btn-group {
-        gap: 6px;
+      .player-panel {
+        position: relative;
+        top: 0;
+        width: 100%;
       }
-      .player-btn-group button {
-        width: 38px;
-        height: 38px;
-        font-size: 1.1em;
+      .artwork-wrapper {
+        width: 220px;
+        height: 220px;
       }
-      .player-btn-group button#player-play-toggle {
-        width: 44px;
-        height: 44px;
-        font-size: 1.25em;
+      .app-tracklist {
+        max-height: none;
       }
     }
   </style>
@@ -338,6 +552,49 @@
     <ul id="cache-list" style="list-style:none;padding-left:0;max-height:150px;overflow-y:auto;margin-top:10px;"></ul>
   </section>
 
+  <!-- Spotify SPA Layout (only visible when js-enabled) -->
+  <div id="app-container" class="app-container">
+    <!-- Left Side: Large Player Card -->
+    <div class="player-panel">
+      <div class="now-playing-card">
+        <div class="artwork-wrapper">
+          <img id="app-artwork" src="images/Base3Logo.jpg" alt="Album Cover" class="app-artwork-img" />
+        </div>
+        <div class="track-meta">
+          <h2 id="app-track-title">Select a track</h2>
+          <p class="artist-name">Gavin — Base 3</p>
+        </div>
+        <div class="progress-bar-group">
+          <div class="time-labels">
+            <span id="app-time-current">0:00</span>
+            <span id="app-time-duration">0:00</span>
+          </div>
+          <input type="range" id="app-seek" min="0" max="100" value="0" aria-label="Seek track" />
+        </div>
+        <div class="control-buttons">
+          <button id="app-repeat" class="circle-btn" title="Repeat Mode">🔁</button>
+          <button id="app-prev" class="circle-btn" title="Previous Track">⏮</button>
+          <button id="app-play-toggle" class="play-trigger-btn" title="Play/Pause">▶</button>
+          <button id="app-next" class="circle-btn" title="Next Track">⏭</button>
+          <button id="app-install-btn" class="circle-btn hidden" style="display:none;" title="Install App">📥</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Side: Playlist tracklist -->
+    <div class="tracklist-panel">
+      <div class="panel-header">
+        <div>
+          <h1>Base 3</h1>
+          <p class="subtitle">9 Tracks • Album Playlist</p>
+        </div>
+      </div>
+      <div id="app-tracklist" class="app-tracklist">
+        <!-- Dynamic rows populated by JS -->
+      </div>
+    </div>
+  </div>
+
   <!-- Sticky Bottom Player Bar (only visible when js-enabled) -->
   <div id="global-player" class="global-player">
     <div class="player-progress-container">
@@ -386,6 +643,7 @@
 
       let deferredPrompt;
       const installBtn = document.getElementById('install-btn');
+      const appInstallBtn = document.getElementById('app-install-btn');
 
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
@@ -394,17 +652,30 @@
           installBtn.style.display = 'block';
           installBtn.classList.remove('hidden');
         }
+        if (appInstallBtn) {
+          appInstallBtn.style.display = 'flex';
+          appInstallBtn.classList.remove('hidden');
+        }
       });
 
-      installBtn?.addEventListener('click', async () => {
+      const handleInstall = async (btn) => {
         if (!deferredPrompt) return;
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to the install prompt: ${outcome}`);
         deferredPrompt = null;
-        installBtn.style.display = 'none';
-        installBtn.classList.add('hidden');
-      });
+        if (installBtn) {
+          installBtn.style.display = 'none';
+          installBtn.classList.add('hidden');
+        }
+        if (appInstallBtn) {
+          appInstallBtn.style.display = 'none';
+          appInstallBtn.classList.add('hidden');
+        }
+      };
+
+      installBtn?.addEventListener('click', () => handleInstall(installBtn));
+      appInstallBtn?.addEventListener('click', () => handleInstall(appInstallBtn));
 
       window.addEventListener('appinstalled', () => {
         deferredPrompt = null;
@@ -412,32 +683,35 @@
           installBtn.style.display = 'none';
           installBtn.classList.add('hidden');
         }
+        if (appInstallBtn) {
+          appInstallBtn.style.display = 'none';
+          appInstallBtn.classList.add('hidden');
+        }
         console.log('PWA was installed');
       });
 
       // Enable custom JS mode and buttons
       document.body.classList.add('js-enabled');
 
-      const playButtons = document.querySelectorAll('.js-play-btn');
+      const appTracklist = document.getElementById('app-tracklist');
       const autoplayToggle = document.getElementById('autoplay-toggle');
       const prevBtn = document.getElementById('prev');
       const nextBtn = document.getElementById('next');
 
-      [...playButtons, autoplayToggle, prevBtn, nextBtn].filter(Boolean).forEach(btn => {
+      [autoplayToggle, prevBtn, nextBtn].filter(Boolean).forEach(btn => {
         btn.classList.remove('disabled');
         btn.disabled = false;
       });
 
-      // Bottom player UI elements
-      const globalPlayer = document.getElementById('global-player');
-      const playerPlayToggle = document.getElementById('player-play-toggle');
-      const playerPrev = document.getElementById('player-prev');
-      const playerNext = document.getElementById('player-next');
-      const playerRepeat = document.getElementById('player-repeat');
-      const playerSeek = document.getElementById('player-seek');
-      const playerTimeCurrent = document.getElementById('player-time-current');
-      const playerTimeDuration = document.getElementById('player-time-duration');
-      const playerTrackTitle = document.getElementById('player-track-title');
+      // Spotify App UI elements
+      const appRepeat = document.getElementById('app-repeat');
+      const appPrev = document.getElementById('app-prev');
+      const appPlayToggle = document.getElementById('app-play-toggle');
+      const appNext = document.getElementById('app-next');
+      const appSeek = document.getElementById('app-seek');
+      const appTimeCurrent = document.getElementById('app-time-current');
+      const appTimeDuration = document.getElementById('app-time-duration');
+      const appTrackTitle = document.getElementById('app-track-title');
 
       let repeatMode = 'off'; // 'off' | 'all' | 'one'
       let isSeeking = false;
@@ -445,6 +719,7 @@
 
       const tracks = document.querySelectorAll('.track audio');
       const trackContainers = document.querySelectorAll('.track');
+      const playButtons = document.querySelectorAll('.js-play-btn');
       const saveButtons = document.querySelectorAll('.save-offline');
       const removeButtons = document.querySelectorAll('.remove-offline');
       const offlineMap = new Map();
@@ -455,6 +730,46 @@
       const dbInfo = document.getElementById('db-info');
       let currentIndex = 0;
       let persistenceTried = false;
+
+      // Move track containers into app-tracklist for Spotify grid layout
+      trackContainers.forEach(tc => {
+        appTracklist.appendChild(tc);
+      });
+
+      // Format download link texts to clean pill names
+      document.querySelectorAll('.track .download-link').forEach(link => {
+        if (link.textContent.includes('M4A')) link.textContent = 'M4A';
+        if (link.textContent.includes('WAV')) link.textContent = 'WAV';
+      });
+
+      // Setup Play buttons inside track containers
+      playButtons.forEach((btn, index) => {
+        btn.textContent = '▶';
+        btn.classList.remove('disabled');
+        btn.disabled = false;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const audio = tracks[index];
+          if (audio.paused) {
+            playTrack(index);
+          } else {
+            audio.pause();
+          }
+        });
+      });
+
+      // Click handler on track rows for background click play trigger
+      trackContainers.forEach((tc, index) => {
+        tc.addEventListener('click', (e) => {
+          if (e.target.closest('a') || e.target.closest('button')) return;
+          const audio = tracks[index];
+          if (audio.paused) {
+            playTrack(index);
+          } else {
+            audio.pause();
+          }
+        });
+      });
 
       const DB_NAME = 'base3';
       const STORE = 'playback_state';
@@ -547,7 +862,7 @@
 
       tracks.forEach(t => wireAudio(t, toKey));
 
-      // Resume last active track and initialize DB info on startup
+      // Resume last active track on load
       (async () => {
         try {
           const db = await openDB();
@@ -562,7 +877,7 @@
                   audio.currentTime = state.currentTime;
                 }
                 currentIndex = i;
-                syncPlayerUI(audio, false);
+                syncAppUI();
                 break;
               }
             }
@@ -613,7 +928,7 @@
         const div = document.createElement('div');
         div.textContent = msg;
         div.style.position = 'fixed';
-        div.style.bottom = '140px';
+        div.style.bottom = '20px';
         div.style.left = '50%';
         div.style.transform = 'translateX(-50%)';
         div.style.background = '#333';
@@ -625,7 +940,8 @@
       }
 
       saveButtons.forEach(button => {
-        button.addEventListener('click', async () => {
+        button.addEventListener('click', async (e) => {
+          e.stopPropagation();
           const audio = button.closest('.track').querySelector('audio');
           const url = toKey(audio);
           if (!url || url === location.pathname) {
@@ -665,7 +981,8 @@
       removeButtons.forEach(button => {
         button.disabled = true;
         button.classList.add('disabled');
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (e) => {
+          e.stopPropagation();
           const audio = button.closest('.track').querySelector('audio');
           const url = toKey(audio);
           sendToServiceWorker('remove', url);
@@ -690,6 +1007,9 @@
           offlineList.appendChild(li);
         });
         offlineTotal.textContent = `Offline: ${offlineMap.size} tracks, ${(bytes / 1e6).toFixed(2)} MB`;
+        
+        // Sync row badges whenever save statuses change
+        syncAppUI();
       }
 
       recalcBtn.addEventListener('click', () => {
@@ -808,27 +1128,27 @@
 
       function updateRepeatUI() {
         if (repeatMode === 'off') {
-          playerRepeat.textContent = '🔁';
-          playerRepeat.classList.remove('active-mode');
-          playerRepeat.title = 'Repeat Off (No Autoplay)';
+          appRepeat.textContent = '🔁';
+          appRepeat.classList.remove('active-mode');
+          appRepeat.title = 'Repeat Off (No Autoplay)';
           autoplay = false;
           if (autoplayToggle) autoplayToggle.textContent = 'Autoplay: Off';
         } else if (repeatMode === 'all') {
-          playerRepeat.textContent = '🔁';
-          playerRepeat.classList.add('active-mode');
-          playerRepeat.title = 'Repeat All (Autoplay On)';
+          appRepeat.textContent = '🔁';
+          appRepeat.classList.add('active-mode');
+          appRepeat.title = 'Repeat All (Autoplay On)';
           autoplay = true;
           if (autoplayToggle) autoplayToggle.textContent = 'Autoplay: On';
         } else if (repeatMode === 'one') {
-          playerRepeat.textContent = '🔂';
-          playerRepeat.classList.add('active-mode');
-          playerRepeat.title = 'Repeat One';
+          appRepeat.textContent = '🔂';
+          appRepeat.classList.add('active-mode');
+          appRepeat.title = 'Repeat One';
           autoplay = false;
           if (autoplayToggle) autoplayToggle.textContent = 'Autoplay: Off';
         }
       }
 
-      playerRepeat.addEventListener('click', cycleRepeatMode);
+      appRepeat.addEventListener('click', cycleRepeatMode);
 
       autoplayToggle?.addEventListener('click', () => {
         autoplay = !autoplay;
@@ -844,48 +1164,51 @@
         return `${m}:${s < 10 ? '0' : ''}${s}`;
       }
 
-      // Sync specific audio element state with UI
-      function syncPlayerUI(audio, showBar = true) {
-        const index = Array.from(tracks).indexOf(audio);
-        const title = trackContainers[index].querySelector('.track-info').textContent;
-        playerTrackTitle.textContent = title;
-
-        if (showBar) {
-          globalPlayer.classList.add('visible');
-        }
+      // Sync active audio element state with Spotify SPA UI
+      function syncAppUI() {
+        const activeAudio = tracks[currentIndex];
+        const title = trackContainers[currentIndex].querySelector('.track-info').textContent;
+        
+        // Update large player card details
+        appTrackTitle.textContent = title;
 
         // Play/Pause icon toggles
-        if (audio.paused) {
-          playerPlayToggle.textContent = '▶';
-          playButtons[index].textContent = '▶ Play';
-          playButtons[index].classList.remove('playing');
+        if (activeAudio.paused) {
+          appPlayToggle.textContent = '▶';
+          appPlayToggle.classList.remove('playing');
         } else {
-          playerPlayToggle.textContent = '⏸';
-          playButtons[index].textContent = '⏸ Pause';
-          playButtons[index].classList.add('playing');
+          appPlayToggle.textContent = '⏸';
+          appPlayToggle.classList.add('playing');
         }
 
         // Seeker ranges
         if (!isSeeking) {
-          playerSeek.max = audio.duration || 100;
-          playerSeek.value = audio.currentTime || 0;
-          playerTimeCurrent.textContent = formatTime(audio.currentTime);
-          playerTimeDuration.textContent = formatTime(audio.duration);
+          appSeek.max = activeAudio.duration || 100;
+          appSeek.value = activeAudio.currentTime || 0;
+          appTimeCurrent.textContent = formatTime(activeAudio.currentTime);
+          appTimeDuration.textContent = formatTime(activeAudio.duration);
         }
 
-        // Highlight active track container
+        // Sync track rows highlights and icons
         trackContainers.forEach((tc, i) => {
-          if (i === index) {
+          const audio = tracks[i];
+          const playBtn = tc.querySelector('.js-play-btn');
+
+          if (i === currentIndex) {
             tc.classList.add('active');
+            if (audio.paused) {
+              playBtn.textContent = '▶';
+            } else {
+              playBtn.textContent = '⏸';
+            }
           } else {
             tc.classList.remove('active');
+            playBtn.textContent = '▶';
           }
         });
 
-        currentIndex = index;
-
         // Media Session API Support
-        updateMediaSession(title, audio);
+        updateMediaSession(title, activeAudio);
       }
 
       function updateMediaSession(title, audio) {
@@ -938,23 +1261,11 @@
         audio.play().catch(err => {
           console.warn('Playback block or error:', err);
         });
-        syncPlayerUI(audio);
+        syncAppUI();
       }
 
-      // Individual play buttons
-      playButtons.forEach((btn, index) => {
-        btn.addEventListener('click', () => {
-          const audio = tracks[index];
-          if (audio.paused) {
-            playTrack(index);
-          } else {
-            audio.pause();
-          }
-        });
-      });
-
       // Bottom bar control buttons
-      playerPlayToggle.addEventListener('click', () => {
+      appPlayToggle.addEventListener('click', () => {
         const audio = tracks[currentIndex];
         if (audio.paused) {
           audio.play().catch(err => console.warn(err));
@@ -963,20 +1274,20 @@
         }
       });
 
-      playerPrev.addEventListener('click', () => playTrack(currentIndex - 1));
-      playerNext.addEventListener('click', () => playTrack(currentIndex + 1));
+      appPrev.addEventListener('click', () => playTrack(currentIndex - 1));
+      appNext.addEventListener('click', () => playTrack(currentIndex + 1));
       prevBtn?.addEventListener('click', () => playTrack(currentIndex - 1));
       nextBtn?.addEventListener('click', () => playTrack(currentIndex + 1));
 
       // Seeker input / change handlers
-      playerSeek.addEventListener('input', () => {
+      appSeek.addEventListener('input', () => {
         isSeeking = true;
-        playerTimeCurrent.textContent = formatTime(playerSeek.value);
+        appTimeCurrent.textContent = formatTime(appSeek.value);
       });
 
-      playerSeek.addEventListener('change', () => {
+      appSeek.addEventListener('change', () => {
         const audio = tracks[currentIndex];
-        audio.currentTime = parseFloat(playerSeek.value);
+        audio.currentTime = parseFloat(appSeek.value);
         isSeeking = false;
       });
 
@@ -989,33 +1300,33 @@
           } else if (repeatMode === 'all') {
             playTrack(index + 1);
           } else {
-            syncPlayerUI(audio);
+            syncAppUI();
           }
         });
 
         audio.addEventListener('timeupdate', () => {
           const activeAudio = tracks[currentIndex];
           if (audio === activeAudio && !isSeeking) {
-            playerSeek.value = audio.currentTime;
-            playerTimeCurrent.textContent = formatTime(audio.currentTime);
+            appSeek.value = audio.currentTime;
+            appTimeCurrent.textContent = formatTime(audio.currentTime);
           }
         });
 
         audio.addEventListener('durationchange', () => {
           const activeAudio = tracks[currentIndex];
           if (audio === activeAudio) {
-            playerSeek.max = audio.duration;
-            playerTimeDuration.textContent = formatTime(audio.duration);
+            appSeek.max = audio.duration;
+            appTimeDuration.textContent = formatTime(audio.duration);
           }
         });
 
         audio.addEventListener('play', () => {
           tracks.forEach(other => { if (other !== audio && !other.paused) other.pause(); });
-          syncPlayerUI(audio);
+          syncAppUI();
         });
 
         audio.addEventListener('pause', () => {
-          syncPlayerUI(audio);
+          syncAppUI();
         });
       });
     });
