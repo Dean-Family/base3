@@ -59,10 +59,21 @@ self.addEventListener('install', e => {
           if (!res.ok) {
             throw new Error(`Failed to fetch ${url}: ${res.status}`);
           }
+          
+          let responseToCache = res.clone();
           if (res.status === 206) {
-            throw new Error(`Received unexpected 206 Partial Content for ${url}`);
+            console.log(`[SW] Handling precompressed 206 response for ${url}`);
+            const blob = await res.blob();
+            const headers = new Headers(res.headers);
+            headers.delete('content-range');
+            responseToCache = new Response(blob, {
+              status: 200,
+              statusText: 'OK',
+              headers
+            });
           }
-          await cache.put(url, res.clone());
+          
+          await cache.put(url, responseToCache);
         } catch (err) {
           console.error(`[SW] Failed to cache ${url}:`, err);
           throw err;
