@@ -375,17 +375,21 @@
         }
       })();
 
+      let swActiveWorker = null;
+
       const swReady = 'serviceWorker' in navigator
-        ? new Promise(resolve => {
+        ? navigator.serviceWorker.ready.then(reg => {
+            console.log('SW: Ready');
+            swActiveWorker = reg.active;
             if (navigator.serviceWorker.controller) {
               console.log('SW: Controller already present');
-              resolve();
+              swActiveWorker = navigator.serviceWorker.controller;
             } else {
               console.log('SW: Waiting for controller...');
               navigator.serviceWorker.addEventListener('controllerchange', () => {
                 console.log('SW: Controller changed/acquired');
-                resolve();
-              }, { once: true });
+                swActiveWorker = navigator.serviceWorker.controller;
+              });
             }
           })
         : Promise.resolve();
@@ -397,12 +401,13 @@
           return;
         }
         swReady.then(() => {
-          console.log(`SW: Sending ${action} for ${url}`);
-          if (!navigator.serviceWorker.controller) {
-            console.error('SW: No controller available to receive message!');
+          const worker = swActiveWorker || navigator.serviceWorker.controller;
+          if (!worker) {
+            console.error('SW: No active worker or controller available to receive message!');
             return;
           }
-          navigator.serviceWorker.controller.postMessage({ action, url });
+          console.log(`SW: Sending ${action} for ${url}`);
+          worker.postMessage({ action, url });
         });
       }
 
