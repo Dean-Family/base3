@@ -7,18 +7,12 @@ const DB_NAME = 'base3-media';
 const DB_VERSION = 1;
 const inFlight = new Map();
 
-const originalLog = console.log;
-const originalError = console.error;
-
 async function broadcastTelemetry(type, payload = {}) {
   const clients = await self.clients.matchAll({ includeUncontrolled: true });
   clients.forEach(c => {
     c.postMessage({ type, ...payload, isTelemetry: true });
   });
 }
-
-console.log = (...args) => { originalLog(...args); broadcastTelemetry('SW_LOG', { text: args.join(' ') }); };
-console.error = (...args) => { originalError(...args); broadcastTelemetry('SW_LOG', { text: 'ERROR: ' + args.join(' ') }); };
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -33,7 +27,7 @@ function openDB() {
       resolve(db);
     };
     req.onerror = () => reject(req.error);
-    req.onblocked = () => originalLog('[SW] IDB blocked');
+    req.onblocked = () => console.log('[SW] IDB blocked');
   });
 }
 
@@ -56,28 +50,38 @@ function mimeFromPath(p) {
 }
 
 self.addEventListener('install', e => {
-  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then(async cache => {
       for (const url of SHELL_ASSETS) {
         try {
-          const req = new Request(url, { cache: 'reload' });
-          const res = await fetch(req);
-          if (res.status === 200) {
-            await cache.put(req, res);
-          } else {
-            originalLog(`[SW] Skip caching ${url} due to status ${res.status}`);
+          const res = await fetch(url, { cache: 'reload' });
+          if (!res.ok) {
+            throw new Error(`Failed to fetch ${url}: ${res.status}`);
           }
+          await cache.put(url, res.clone());
         } catch (err) {
-          originalLog(`[SW] Failed to cache ${url}: ${err.message}`);
+          console.error(`[SW] Failed to cache ${url}:`, err);
+          throw err;
         }
       }
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(self.clients.claim().then(() => broadcastTelemetry('SW_READY')));
+  e.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
+        )
+      )
+    ])
+  );
 });
 
 async function serveFromIDB(req) {
@@ -130,18 +134,42 @@ async function serveFromIDB(req) {
 }
 
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (url.pathname.startsWith('/music/')) {
-    e.respondWith(serveFromIDB(e.request));
+  const req = e.request;
+  if (req.method !== 'GET') {
     return;
   }
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+
+  console.log('[sw] fetch', req.mode, req.destination, req.url);
+
+  const url = new URL(req.url);
+  if (url.pathname.startsWith('/music/')) {
+    e.respondWith(serveFromIDB(req));
+    return;
+  }
+
+  if (req.mode === 'navigate') {
+    e.respondWith(
+      fetch(req).catch(async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const shell = await cache.match('/index.html', {
+          ignoreSearch: true,
+          ignoreVary: true
+        });
+        return shell || Response.error();
+      })
+    );
+    return;
+  }
+
+  e.respondWith(
+    caches.match(req).then(cached => cached || fetch(req))
+  );
 });
 
 self.addEventListener('message', e => {
   const { action, url } = e.data || {};
   if (!action) return;
-  originalLog(`[SW] Action: ${action} for ${url}`);
+  console.log(`[SW] Action: ${action} for ${url}`);
 
   if (action === 'PING') { broadcastTelemetry('PONG'); return; }
   if (!url) return;
