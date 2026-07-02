@@ -95,21 +95,50 @@
     }
     .artwork-wrapper {
       position: relative;
-      width: 260px;
-      height: 260px;
+      width: 240px;
+      height: 240px;
       margin: 0 auto 20px auto;
-      border-radius: 10px;
+      border-radius: 50%;
       overflow: hidden;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.6), 0 0 0 10px rgba(255,255,255,0.02);
       transition: transform 0.3s ease;
     }
     .artwork-wrapper:hover {
       transform: scale(1.02);
     }
+    .artwork-wrapper::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(255,255,255,0.03) 40%, rgba(0,0,0,0.4) 100%),
+                  linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+      pointer-events: none;
+      border-radius: 50%;
+      z-index: 5;
+    }
+    .artwork-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px; height: 16px;
+      background: #121212;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 50%;
+      z-index: 10;
+      pointer-events: none;
+    }
     .app-artwork-img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      border-radius: 50%;
+      animation: rotate-vinyl 25s linear infinite;
+      animation-play-state: paused;
+    }
+    @keyframes rotate-vinyl {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
     .track-meta h2 {
       font-size: 1.3em;
@@ -313,9 +342,47 @@
       text-overflow: ellipsis;
       text-align: left;
       width: 100%;
+      display: flex;
+      align-items: center;
     }
     body.js-enabled .track.active .track-info {
       color: #1ed760;
+    }
+    
+    /* Bouncing Equalizer Wave Indicator */
+    .eq-indicator {
+      display: none;
+      align-items: flex-end;
+      gap: 2px;
+      width: 12px;
+      height: 12px;
+      margin-left: 6px;
+      flex-shrink: 0;
+    }
+    body.js-enabled .track.active.playing-state .eq-indicator {
+      display: inline-flex;
+    }
+    body.js-enabled .track.active.paused-state .eq-indicator {
+      display: inline-flex;
+    }
+    body.js-enabled .track.active.paused-state .eq-bar {
+      animation-play-state: paused;
+    }
+    .eq-bar {
+      width: 2px;
+      height: 100%;
+      background-color: #1ed760;
+      border-radius: 1px;
+      animation: eq-bounce 1s ease-in-out infinite alternate;
+      transform-origin: bottom;
+    }
+    .eq-bar:nth-child(1) { animation-duration: 0.8s; }
+    .eq-bar:nth-child(2) { animation-duration: 0.5s; animation-delay: 0.15s; }
+    .eq-bar:nth-child(3) { animation-duration: 0.7s; animation-delay: 0.3s; }
+
+    @keyframes eq-bounce {
+      0% { transform: scaleY(0.2); }
+      100% { transform: scaleY(1); }
     }
     
     body.js-enabled .track .download-link {
@@ -409,8 +476,8 @@
         width: 100%;
       }
       .artwork-wrapper {
-        width: 200px;
-        height: 200px;
+        width: 180px;
+        height: 180px;
       }
       .app-tracklist {
         max-height: none;
@@ -942,7 +1009,13 @@ For these and/or other purposes and motivations, and without any expectation of 
         const m4aLink = tc.querySelector('a[href$=".m4a"]');
         const wavLink = tc.querySelector('a[href$=".wav"]');
 
-        if (title) metaGroup.appendChild(title);
+        if (title) {
+          const eq = document.createElement('span');
+          eq.className = 'eq-indicator';
+          eq.innerHTML = '<span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>';
+          title.appendChild(eq);
+          metaGroup.appendChild(title);
+        }
 
         if (m4aLink || wavLink) {
           const linksRow = document.createElement('div');
@@ -1419,21 +1492,24 @@ For these and/or other purposes and motivations, and without any expectation of 
         return `${m}:${s < 10 ? '0' : ''}${s}`;
       }
 
-      // Sync active audio element state with Spotify SPA UI
       function syncAppUI() {
         const activeAudio = tracks[currentIndex];
-        const title = trackContainers[currentIndex].querySelector('.track-info').textContent;
+        const titleEl = trackContainers[currentIndex].querySelector('.track-info');
+        const title = titleEl ? titleEl.childNodes[0].textContent.trim() : '';
         
         // Update large player card details
         appTrackTitle.textContent = title;
 
-        // Play/Pause icon toggles
+        // Play/Pause icon toggles & artwork spin
+        const artwork = document.getElementById('app-artwork');
         if (activeAudio.paused) {
           appPlayToggle.textContent = '▶';
           appPlayToggle.classList.remove('playing');
+          if (artwork) artwork.style.animationPlayState = 'paused';
         } else {
           appPlayToggle.textContent = '❙❙';
           appPlayToggle.classList.add('playing');
+          if (artwork) artwork.style.animationPlayState = 'running';
         }
 
         // Seeker ranges
@@ -1453,11 +1529,17 @@ For these and/or other purposes and motivations, and without any expectation of 
             tc.classList.add('active');
             if (audio.paused) {
               playBtn.textContent = '▶';
+              tc.classList.remove('playing-state');
+              tc.classList.add('paused-state');
             } else {
               playBtn.textContent = '❙❙';
+              tc.classList.add('playing-state');
+              tc.classList.remove('paused-state');
             }
           } else {
             tc.classList.remove('active');
+            tc.classList.remove('playing-state');
+            tc.classList.remove('paused-state');
             playBtn.textContent = '▶';
           }
         });
