@@ -929,6 +929,7 @@ For these and/or other purposes and motivations, and without any expectation of 
       const dbInfo = document.getElementById('db-info');
       let currentIndex = 0;
       let persistenceTried = false;
+      let isAutoplayTransition = false;
 
       // Move track containers into app-tracklist and wrap metadata for responsive layout
       trackContainers.forEach((tc, index) => {
@@ -1042,6 +1043,11 @@ For these and/or other purposes and motivations, and without any expectation of 
 
       function wireAudio(audio, urlForTrackKeyFn) {
         audio.addEventListener('play', async () => {
+          if (isAutoplayTransition) {
+            audio.currentTime = 0;
+            isAutoplayTransition = false;
+            return;
+          }
           try {
             const trackKey = urlForTrackKeyFn(audio);
             const db = await openDB();
@@ -1486,10 +1492,16 @@ For these and/or other purposes and motivations, and without any expectation of 
           audio.pause();
         });
         navigator.mediaSession.setActionHandler('previoustrack', () => {
-          playTrack(currentIndex - 1);
+          const audio = tracks[currentIndex];
+          if (audio.currentTime > 3) {
+            audio.currentTime = 0;
+            audio.play().catch(err => console.warn(err));
+          } else {
+            playTrack(currentIndex - 1, true);
+          }
         });
         navigator.mediaSession.setActionHandler('nexttrack', () => {
-          playTrack(currentIndex + 1);
+          playTrack(currentIndex + 1, true);
         });
         navigator.mediaSession.setActionHandler('seekto', (details) => {
           const audio = tracks[currentIndex];
@@ -1500,17 +1512,36 @@ For these and/or other purposes and motivations, and without any expectation of 
       }
 
       // Play selected track index
-      function playTrack(index) {
-        if (index < 0) index = tracks.length - 1;
-        else if (index >= tracks.length) {
+      function playTrack(index, forceStartFromBeginning = false) {
+        if (index < 0) {
+          index = tracks.length - 1;
+          forceStartFromBeginning = true;
+        } else if (index >= tracks.length) {
           if (repeatMode === 'all') {
             index = 0;
+            forceStartFromBeginning = true;
           } else {
-            const activeAudio = tracks[currentIndex];
-            if (activeAudio && !activeAudio.paused) activeAudio.pause();
+            // End of album reached: go back to the beginning (paused)
+            currentIndex = 0;
+            const firstAudio = tracks[0];
+            tracks.forEach(t => { if (!t.paused) t.pause(); });
+            firstAudio.currentTime = 0;
+
+            (async () => {
+              try {
+                const db = await openDB();
+                await savePlaybackState(db, toKey(firstAudio), 0, Date.now());
+                db.close();
+              } catch (e) {}
+            })();
+
             syncAppUI();
             return;
           }
+        }
+
+        if (forceStartFromBeginning) {
+          isAutoplayTransition = true;
         }
 
         currentIndex = index;
@@ -1533,10 +1564,26 @@ For these and/or other purposes and motivations, and without any expectation of 
         }
       });
 
-      appPrev.addEventListener('click', () => playTrack(currentIndex - 1));
-      appNext.addEventListener('click', () => playTrack(currentIndex + 1));
-      prevBtn?.addEventListener('click', () => playTrack(currentIndex - 1));
-      nextBtn?.addEventListener('click', () => playTrack(currentIndex + 1));
+      appPrev.addEventListener('click', () => {
+        const audio = tracks[currentIndex];
+        if (audio.currentTime > 3) {
+          audio.currentTime = 0;
+          audio.play().catch(err => console.warn(err));
+        } else {
+          playTrack(currentIndex - 1, true);
+        }
+      });
+      appNext.addEventListener('click', () => playTrack(currentIndex + 1, true));
+      prevBtn?.addEventListener('click', () => {
+        const audio = tracks[currentIndex];
+        if (audio.currentTime > 3) {
+          audio.currentTime = 0;
+          audio.play().catch(err => console.warn(err));
+        } else {
+          playTrack(currentIndex - 1, true);
+        }
+      });
+      nextBtn?.addEventListener('click', () => playTrack(currentIndex + 1, true));
 
       // Seeker input / change handlers
       appSeek.addEventListener('input', () => {
@@ -1564,7 +1611,7 @@ For these and/or other purposes and motivations, and without any expectation of 
             audio.currentTime = 0;
             audio.play().catch(err => console.warn(err));
           } else {
-            playTrack(index + 1);
+            playTrack(index + 1, true);
           }
         });
 
