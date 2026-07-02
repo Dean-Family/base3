@@ -17,54 +17,55 @@ Everything in this project is released as freely as I can release it.
 
 The music, artwork, text, and code may be used, copied, modified, shared, sampled, remixed, studied, redistributed, or built upon. I claim no restriction over how you use it.
 
-For people who need formal license language, you may treat any part of this project as available under CC0, MIT, or BSD, or the Guthrie License, whichever is most useful for your purpose.
+For people who need formal license language, you may treat any part of this project as available under any of the four licenses below (the Guthrie License, CC0 1.0 Universal, the MIT License, or the BSD 3-Clause License), whichever is most useful for your purpose.
 
 I am not interested in drawing hard lines between the album and the software. The whole project is offered into the commons.
 
 
 ============================================================
-LICENSING OPTIONS
+LICENSING TERMS
 ============================================================
 
-You may use, study, share, or build upon any part of this project under the terms of either Option 1 or Option 2 below.
+You may use, copy, modify, share, or build upon any part of this project under the terms of any of the four licenses listed below:
 
 
 ============================================================
-Option 1: Triple-License (MIT / BSD / CC0)
+1. The Guthrie License (v1.1)
 ============================================================
 
-----------------------------
-MIT License
-----------------------------
+"This song is Copyrighted... for a period of 28 years, and anybody caught singin' it 
+without our permission, will be mighty good friends of ourn, cause we don't give a 
+dern. Publish it. Write it. Sing it. Swing to it. Yodel it. We wrote it, that's all 
+we wanted to do." — Woody Guthrie
 
-Copyright (c) 2024 Gavin
+1. The Dedication
+The author(s) of this work hereby dedicate any and all copyright interest in this 
+work to the public domain. We do this for the benefit of the public at large and 
+with the intent to relinquish in perpetuity all present and future rights to this 
+work under copyright law.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+2. The Permission
+You are free to use this work in any way you see fit. You can publish it, write it, 
+sing it, swing to it, or yodel it. You can use it for commercial or non-commercial 
+purposes. What you do with it is your business.
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+3. The Friendship Clause
+If you use this work, you are hereby considered a "mighty good friend of ourn." 
+No attribution is required, but if you want to tell folks where you got it, 
+that’s fine by us too.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+4. The "No Derns Given" Disclaimer
+THIS WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. THE AUTHORS DON'T 
+GIVE A DERN IF THIS WORK SUITS YOUR NEEDS OR IF IT CAUSES PROBLEMS. IN NO EVENT 
+SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY. 
 
-----------------------------
-BSD 3-Clause License
-----------------------------
+5. The Intent
+We wrote it; that's all we wanted to do.
 
-Copyright (c) 2024, Gavin
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-3. Neither the name of Gavin nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-----------------------------
-Creative Commons CC0 1.0 Universal
-----------------------------
+============================================================
+2. Creative Commons CC0 1.0 Universal
+============================================================
 
 Creative Commons Legal Code
 
@@ -98,35 +99,31 @@ For these and/or other purposes and motivations, and without any expectation of 
 
 
 ============================================================
-Option 2: The Guthrie License
+3. The MIT License
 ============================================================
-Version 1.1
 
-> "This song is Copyrighted... for a period of 28 years, and anybody caught singin' it 
-> without our permission, will be mighty good friends of ourn, cause we don't give a 
-> dern. Publish it. Write it. Sing it. Swing to it. Yodel it. We wrote it, that's all 
-> we wanted to do." — Woody Guthrie
+Copyright (c) 2024 Gavin
 
-1. The Dedication
-The author(s) of this work hereby dedicate any and all copyright interest in this 
-work to the public domain. We do this for the benefit of the public at large and 
-with the intent to relinquish in perpetuity all present and future rights to this 
-work under copyright law.
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-2. The Permission
-You are free to use this work in any way you see fit. You can publish it, write it, 
-sing it, swing to it, or yodel it. You can use it for commercial or non-commercial 
-purposes. What you do with it is your business.
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-3. The Friendship Clause
-If you use this work, you are hereby considered a "mighty good friend of ourn." 
-No attribution is required, but if you want to tell folks where you got it, 
-that’s fine by us too.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-4. The "No Derns Given" Disclaimer
-THIS WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. THE AUTHORS DON'T 
-GIVE A DERN IF THIS WORK SUITS YOUR NEEDS OR IF IT CAUSES PROBLEMS. IN NO EVENT 
-SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY. 
 
-5. The Intent
-We wrote it; that's all we wanted to do.
+============================================================
+4. The BSD 3-Clause License
+============================================================
+
+Copyright (c) 2024, Gavin
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of Gavin nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
