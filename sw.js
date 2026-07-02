@@ -1,7 +1,16 @@
 // sw.js - Service Worker for robust offline audio playback via IndexedDB
 
-const CACHE_NAME = 'base3-shell-v25';
-const SHELL_ASSETS = ['/', '/index.html', '/manifest.json', '/images/Base3Logo.jpg'];
+const CACHE_NAME = 'base3-shell-v26';
+const SHELL_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/images/Base3Logo.jpg',
+  '/images/icon-192.png',
+  '/images/icon-512.png',
+  '/images/screenshot-wide.png',
+  '/images/screenshot-default.png'
+];
 
 const DB_NAME = 'base3-media';
 const DB_VERSION = 1;
