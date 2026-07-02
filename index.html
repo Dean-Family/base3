@@ -1057,6 +1057,17 @@ For these and/or other purposes and motivations, and without any expectation of 
           }
         });
 
+        audio.addEventListener('pause', async () => {
+          try {
+            const trackKey = urlForTrackKeyFn(audio);
+            const db = await openDB();
+            await savePlaybackState(db, trackKey, audio.currentTime, Date.now());
+            db.close();
+          } catch (e) {
+            /* ignore */
+          }
+        });
+
         let lastSave = 0;
         audio.addEventListener('timeupdate', async () => {
           const now = Date.now();
@@ -1086,6 +1097,14 @@ For these and/or other purposes and motivations, and without any expectation of 
         try {
           const db = await openDB();
           dbInfo.textContent = `DB: v${db.version}`;
+
+          // Restore Repeat Mode
+          const repeatState = await getPlaybackState(db, 'repeat-mode');
+          if (repeatState && repeatState.value) {
+            repeatMode = repeatState.value;
+            updateRepeatUI();
+          }
+
           const last = await getPlaybackState(db, 'last-active-track');
           if (last && last.trackKey) {
             for (let i = 0; i < tracks.length; i++) {
@@ -1334,6 +1353,15 @@ For these and/or other purposes and motivations, and without any expectation of 
       refreshCacheList();
 
       // Autoplay / Repeat states sync
+      async function saveRepeatMode(mode) {
+        try {
+          const db = await openDB();
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).put({ id: 'repeat-mode', value: mode, updatedAt: Date.now() });
+          db.close();
+        } catch (e) {}
+      }
+
       function cycleRepeatMode() {
         if (repeatMode === 'off') {
           repeatMode = 'all';
@@ -1343,6 +1371,7 @@ For these and/or other purposes and motivations, and without any expectation of 
           repeatMode = 'off';
         }
         updateRepeatUI();
+        saveRepeatMode(repeatMode);
       }
 
       function updateRepeatUI() {
@@ -1373,6 +1402,7 @@ For these and/or other purposes and motivations, and without any expectation of 
         autoplay = !autoplay;
         repeatMode = autoplay ? 'all' : 'off';
         updateRepeatUI();
+        saveRepeatMode(repeatMode);
       });
 
       // UI Time Formatting
@@ -1522,7 +1552,14 @@ For these and/or other purposes and motivations, and without any expectation of 
 
       // Audio Event Listeners for synchronizing and ended triggers
       tracks.forEach((audio, index) => {
-        audio.addEventListener('ended', () => {
+        audio.addEventListener('ended', async () => {
+          try {
+            const trackKey = toKey(audio);
+            const db = await openDB();
+            await savePlaybackState(db, trackKey, 0, Date.now());
+            db.close();
+          } catch (e) {}
+
           if (repeatMode === 'one') {
             audio.currentTime = 0;
             audio.play().catch(err => console.warn(err));
