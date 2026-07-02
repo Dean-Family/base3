@@ -10,10 +10,14 @@
   <meta name="theme-color" content="#1db954" />
   <title>Base 3 - Album Player</title>
   <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
       margin: 0;
       padding: 0;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -44,7 +48,7 @@
     /* Hide standard UI in PWA/JS mode */
     body.js-enabled > .logo,
     body.js-enabled > #autoplay-toggle,
-    body.js-enabled > div:has(#prev),
+    body.js-enabled > #nav-buttons-container,
     body.js-enabled > #debug-tools,
     body.js-enabled > footer {
       display: none !important;
@@ -293,6 +297,11 @@
       align-items: flex-start;
       gap: 4px;
     }
+    body.js-enabled .track .track-links-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
     
     body.js-enabled .track .track-info {
       margin: 0;
@@ -412,6 +421,33 @@
       }
     }
 
+    @media (max-width: 600px) {
+      .app-container {
+        width: 100% !important;
+        margin: 0 auto !important;
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        padding: 12px 8px !important;
+      }
+      .now-playing-card {
+        padding: 16px !important;
+      }
+      .control-buttons {
+        gap: 8px !important;
+      }
+      .circle-btn {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 1.1em !important;
+      }
+      .play-trigger-btn {
+        width: 48px !important;
+        height: 48px !important;
+        font-size: 1.3em !important;
+      }
+    }
+
     /* Hidden License Modal styling */
     .license-modal {
       position: fixed;
@@ -490,7 +526,7 @@
   <button id="install-btn" class="hidden" style="display:none;">Install App</button>
 
   <!-- Navigation Buttons (disabled by default for noscript) -->
-  <div>
+  <div id="nav-buttons-container">
     <button id="prev" aria-label="Previous Track" class="disabled" disabled>Previous</button>
     <button id="next" aria-label="Next Track" class="disabled" disabled>Next</button>
   </div>
@@ -906,13 +942,19 @@ For these and/or other purposes and motivations, and without any expectation of 
         const wavLink = tc.querySelector('a[href$=".wav"]');
 
         if (title) metaGroup.appendChild(title);
-        if (m4aLink) {
-          if (m4aLink.textContent.includes('M4A')) m4aLink.textContent = 'M4A';
-          metaGroup.appendChild(m4aLink);
-        }
-        if (wavLink) {
-          if (wavLink.textContent.includes('WAV')) wavLink.textContent = 'WAV';
-          metaGroup.appendChild(wavLink);
+
+        if (m4aLink || wavLink) {
+          const linksRow = document.createElement('div');
+          linksRow.className = 'track-links-row';
+          if (m4aLink) {
+            if (m4aLink.textContent.includes('M4A')) m4aLink.textContent = 'M4A';
+            linksRow.appendChild(m4aLink);
+          }
+          if (wavLink) {
+            if (wavLink.textContent.includes('WAV')) wavLink.textContent = 'WAV';
+            linksRow.appendChild(wavLink);
+          }
+          metaGroup.appendChild(linksRow);
         }
 
         const saveBtn = tc.querySelector('.save-offline');
